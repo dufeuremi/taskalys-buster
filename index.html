@@ -1,0 +1,2802 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapport d'audience - Taskalys</title>
+    <link rel="icon" type="image/x-icon" href="favicon-32x32.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Bibliothèques pour traitement local -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            background-color: #2c2c83;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            padding: 20px;
+        }
+
+        .container {
+            padding: 40px;
+            max-width: 700px;
+            width: 100%;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo img {
+            height: 60px;
+            width: auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 2.5rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            white-space: nowrap;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 1.1rem;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+
+        input[type="text"]:focus, input[type="password"]:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        input[type="text"]::placeholder, input[type="password"]::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .password-toggle svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+            transition: fill 0.3s ease;
+        }
+
+        .password-toggle:hover svg {
+            fill: rgba(255, 255, 255, 0.8);
+        }
+
+        .password-input-wrapper {
+            position: relative;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-input-label {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 15px;
+            padding: 20px;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+            min-height: 80px;
+        }
+
+        .file-input-label:hover {
+            border-color: rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .file-input-label.has-file {
+            border-color: rgba(76, 175, 80, 0.6);
+            background: rgba(76, 175, 80, 0.1);
+            color: #4CAF50;
+        }
+
+        .excel-input-label {
+            border-color: rgba(34, 139, 34, 0.5);
+            background: rgba(34, 139, 34, 0.1);
+        }
+
+        .excel-input-label:hover {
+            border-color: rgba(34, 139, 34, 0.8);
+            background: rgba(34, 139, 34, 0.2);
+        }
+
+        .excel-input-label.has-file {
+            border-color: #22B022;
+            background: rgba(34, 176, 34, 0.2);
+            color: #22B022;
+        }
+
+        .powerpoint-input-label {
+            border-color: rgba(255, 87, 34, 0.5);
+            background: rgba(255, 87, 34, 0.1);
+        }
+
+        .powerpoint-input-label:hover {
+            border-color: rgba(255, 87, 34, 0.8);
+            background: rgba(255, 87, 34, 0.2);
+        }
+
+        .powerpoint-input-label.has-file {
+            border-color: #FF5722;
+            background: rgba(255, 87, 34, 0.2);
+            color: #FF5722;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 18px;
+            background: #a2137b;
+            border: none;
+            border-radius: 20px;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .submit-btn:hover {
+            background: #8a0f66;
+            transform: translateY(-2px);
+        }
+
+        .submit-btn:disabled {
+            background: rgba(255, 255, 255, 0.2);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .doc-btn {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.9rem;
+            text-decoration: underline;
+            margin-top: 15px;
+            padding: 0;
+            transition: color 0.3s ease;
+        }
+
+        .doc-btn:hover {
+            color: rgba(255, 255, 255, 1);
+        }
+
+        .loading-screen {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading-screen.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 30px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .time-estimation {
+            margin-top: 20px;
+            text-align: center;
+            color: white;
+        }
+
+        .estimation-text {
+            font-size: 1rem;
+            margin-bottom: 10px;
+        }
+
+        .time-value {
+            font-weight: 600;
+            color: #a2137b;
+            font-size: 1.1rem;
+        }
+
+        .progress-info {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-top: 5px;
+        }
+
+        .dots {
+            display: inline-block;
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+
+        .ppt-loading-screen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #2c2c83;
+            z-index: 99999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: 'Poppins', sans-serif;
+            text-align: center;
+        }
+
+        .ppt-loading-screen.active {
+            display: flex;
+        }
+
+        .ppt-loading-logo {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+
+        .ppt-loading-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .ppt-loading-subtitle {
+            font-size: 1.2rem;
+            margin-bottom: 60px;
+            text-align: center;
+            opacity: 0.8;
+        }
+
+        .progress-container {
+            width: 80%;
+            max-width: 600px;
+            height: 16px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 30px 0;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #a2137b, #ff6b9d, #ff9ec7, #a2137b);
+            background-size: 300% 100%;
+            border-radius: 8px;
+            width: 0%;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            animation: gradientMove 1.5s ease-in-out infinite;
+            box-shadow: 0 0 10px rgba(162, 19, 123, 0.5);
+        }
+
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .progress-text {
+            font-size: 1.1rem;
+            text-align: center;
+            opacity: 0.9;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .ppt-status {
+            font-size: 1rem;
+            text-align: center;
+            margin-top: 20px;
+            opacity: 0.8;
+            min-height: 25px;
+            max-width: 80%;
+            line-height: 1.4;
+        }
+
+        .warning-message {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid rgba(255, 193, 7, 0.5);
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-top: 30px;
+            font-size: 0.95rem;
+            color: #ffc107;
+            max-width: 500px;
+            line-height: 1.5;
+        }
+
+        .warning-icon {
+            display: inline-block;
+            margin-right: 8px;
+            font-size: 1.1rem;
+        }
+
+        .powered-by {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .powered-by a {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+        }
+
+        .powered-by a:hover {
+            text-decoration: underline;
+        }
+
+        .form-container {
+            transition: opacity 0.3s ease;
+        }
+
+        .form-container.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .logs-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(44, 44, 131, 0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            max-height: 300px;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+
+        .logs-container.collapsed {
+            transform: translateY(calc(100% - 40px));
+        }
+
+        .logs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+        }
+
+        .logs-header h3 {
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .clear-logs-btn {
+            background: #a2137b;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .clear-logs-btn:hover {
+            background: #8a0f66;
+        }
+
+        .logs-content {
+            max-height: 250px;
+            overflow-y: auto;
+            padding: 10px 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 3px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .log-time {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.75rem;
+            min-width: 80px;
+        }
+
+        .log-message {
+            color: white;
+            flex: 1;
+        }
+
+        .log-entry.info .log-message {
+            color: #4CAF50;
+        }
+
+        .log-entry.warning .log-message {
+            color: #FF9800;
+        }
+
+        .log-entry.error .log-message {
+            color: #FF5722;
+        }
+
+        .log-entry.success .log-message {
+            color: #4CAF50;
+            font-weight: 600;
+        }
+
+        /* Styles pour l'éditeur d'email simplifié */
+        .email-editor-simple {
+            margin-top: 10px;
+        }
+
+
+        #emailTemplateEditor {
+            width: 100%;
+            min-height: 150px;
+            max-height: 400px;
+            padding: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 0.95rem;
+            font-family: 'Poppins', sans-serif;
+            line-height: 1.6;
+            resize: vertical;
+            transition: all 0.3s ease;
+            overflow-y: auto;
+        }
+
+        #emailTemplateEditor:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        #emailTemplateEditor::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        /* Style de la scrollbar pour le textarea */
+        #emailTemplateEditor::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #emailTemplateEditor::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        #emailTemplateEditor::-webkit-scrollbar-thumb {
+            background: rgba(162, 19, 123, 0.6);
+            border-radius: 3px;
+        }
+
+        #emailTemplateEditor::-webkit-scrollbar-thumb:hover {
+            background: rgba(162, 19, 123, 0.8);
+        }
+
+
+
+
+        /* Styles pour le champ email */
+        input[type="email"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+
+        input[type="email"]:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        input[type="email"]::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+                margin: 10px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .logo img {
+                height: 50px;
+            }
+
+            .logs-container {
+                max-height: 200px;
+            }
+
+            .logs-content {
+                max-height: 150px;
+                font-size: 0.8rem;
+            }
+
+            .email-editor-container {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .variables-panel {
+                flex: none;
+            }
+
+            .variable-blocks {
+                flex-direction: row;
+                flex-wrap: wrap;
+            }
+
+            .variable-block {
+                flex: 1;
+                min-width: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <img src="assets/logo_buster.svg" alt="Buster Logo">
+        </div>
+
+        <h1>Rapport d'audience</h1>
+
+        <div class="form-container" id="formContainer">
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label for="excelFile">Fichier Excel</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="excelFile" name="excelFile" class="file-input" accept=".xlsx,.xls" required>
+                        <label for="excelFile" class="file-input-label excel-input-label" id="excelLabel">
+                            <img src="assets/logo_excel.svg" alt="Excel" style="width: 48px; height: 48px;">
+                            <span>Sélectionner un fichier Excel (.xlsx, .xls)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="powerpointFile">Fichier PowerPoint</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="powerpointFile" name="powerpointFile" class="file-input" accept=".pptx,.ppt" required>
+                        <label for="powerpointFile" class="file-input-label powerpoint-input-label" id="powerpointLabel">
+                            <img src="assets/logo_powerpoint.svg" alt="PowerPoint" style="width: 48px; height: 48px;">
+                            <span>Sélectionner un fichier PowerPoint (.pptx, .ppt)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="emailInput">Email de destination</label>
+                    <input type="email" id="emailInput" name="emailInput" placeholder="votre@email.com" required>
+                </div>
+
+
+                <div class="form-group">
+                    <label for="emailTemplateEditor">Template Email</label>
+                    <div class="email-editor-simple">
+                        <textarea id="emailTemplateEditor" name="emailTemplateEditor" placeholder="Tapez votre template email ici...">Bonjour,
+Vous trouverez ci-joint le bilan complet de votre campagne menée sur les bus de {VILLE} {PERIODE}.
+Durant cette période (semaine {NB_SEMAINE}), vous avez touché une audience de {AUDIENCE} personnes et votre campagne a généré plus de {ODV} contacts.
+Parcourez le document en pièce jointe pour connaître les indicateurs clés de votre campagne et le profil de votre audience.
+Bien à vous,</textarea>
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    Générer
+                </button>
+            </form>
+
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button type="button" class="doc-btn" id="docBtn">
+                    Documentation
+                </button>
+            </div>
+        </div>
+
+        <div class="loading-screen" id="loadingScreen">
+            <div class="spinner"></div>
+            <div class="loading-text">
+                Traitement en cours<span class="dots"></span><br>
+                Génération des rapports d'audience
+            </div>
+            <div class="time-estimation">
+                <div class="estimation-text">
+                    <span id="timeRemainingText">Estimation du temps restant :</span>
+                    <span id="timeRemainingValue" class="time-value">Calcul en cours...</span>
+                </div>
+                <div class="progress-info">
+                    <span id="processedCount">0</span> / <span id="totalCount">0</span> fichiers traités
+                </div>
+            </div>
+        </div>
+
+        <div class="ppt-loading-screen" id="pptLoadingScreen">
+            <img src="assets/logo_buster.svg" alt="Logo" class="ppt-loading-logo">
+            <div class="ppt-loading-title">Traitement en cours</div>
+            <div class="ppt-loading-subtitle">Génération des rapports d'audience...</div>
+            
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            
+            <div class="progress-text" id="progressText">0/0 fichiers traités</div>
+            <div class="ppt-status" id="pptStatus">Initialisation...</div>
+            
+            <div class="warning-message">
+                <span class="warning-icon">⚠️</span>
+                <strong>Ne fermez pas cette page</strong><br>
+                Le traitement est en cours. Les rapports seront envoyés par email.
+            </div>
+        </div>
+
+        <div class="powered-by">
+            Powered by <a href="https://taskalys.fr" target="_blank">Taskalys.fr</a>
+        </div>
+    </div>
+
+    <div class="logs-container" id="logsContainer">
+        <div class="logs-header">
+            <h3>📋 Logs de traitement</h3>
+            <button id="clearLogsBtn" class="clear-logs-btn">Effacer</button>
+        </div>
+        <div class="logs-content" id="logsContent">
+            <div class="log-entry info">
+                <span class="log-time">[${new Date().toLocaleTimeString()}]</span>
+                <span class="log-message">Interface prête - En attente de fichiers</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Fonction pour traiter les graphiques via XML uniquement (sans Excel)
+        async function processEmbeddedCharts(zip, templateData) {
+            try {
+                addLog('📊 RECHERCHE DES GRAPHIQUES VIA XML UNIQUEMENT', 'info');
+                
+                let graphiquesTrouves = 0;
+                
+                // 1. Chercher les fichiers XML des graphiques
+                addLog('📊 RECHERCHE DES FICHIERS XML DE GRAPHIQUES...', 'info');
+                const chartXmlFiles = [];
+                zip.forEach((relativePath, file) => {
+                    if (relativePath.includes('charts/chart') && relativePath.endsWith('.xml')) {
+                        chartXmlFiles.push(relativePath);
+                    }
+                });
+                
+                addLog(`📋 ${chartXmlFiles.length} fichiers XML de graphiques trouvés`, 'info');
+                
+                // Traiter chaque fichier XML de graphique
+                for (const chartXmlFile of chartXmlFiles) {
+                    try {
+                        addLog(`  📊 Traitement du graphique XML: ${chartXmlFile}`, 'info');
+                        const chartContent = await zip.file(chartXmlFile).async('string');
+                        
+                        // Modifier le contenu XML du graphique
+                        const modifiedContent = await processChartXmlContent(chartContent, templateData);
+                        
+                        if (modifiedContent !== chartContent) {
+                            zip.file(chartXmlFile, modifiedContent);
+                            addLog(`    ✅ Graphique XML modifié: ${chartXmlFile}`, 'success');
+                            graphiquesTrouves++;
+                        }
+                        
+                    } catch (error) {
+                        addLog(`  ⚠️ Erreur traitement ${chartXmlFile}: ${error.message}`, 'warning');
+                    }
+                }
+                
+                // 2. Si aucun graphique XML trouvé, chercher dans les slides
+                if (graphiquesTrouves === 0) {
+                    addLog('📊 Aucun graphique XML trouvé, recherche dans les slides...', 'info');
+                    graphiquesTrouves = await processChartsInSlides(zip, templateData);
+                }
+
+                return graphiquesTrouves;
+
+            } catch (error) {
+                addLog(`❌ Erreur traitement graphiques XML: ${error.message}`, 'error');
+                return 0;
+            }
+        }
+
+        // Fonction pour traiter le contenu XML des graphiques
+        async function processChartXmlContent(chartContent, templateData) {
+            try {
+                addLog(`    🔄 TRAITEMENT XML DU GRAPHIQUE`, 'info');
+                
+                // DEBUG: Analyser le contenu XML pour comprendre la structure
+                addLog(`    🔍 ANALYSE DU CONTENU XML...`, 'info');
+                
+                // Chercher les balises XML importantes
+                const hasValTags = chartContent.includes('<c:val>');
+                const hasVTags = chartContent.includes('<c:v>');
+                const hasPtTags = chartContent.includes('<c:pt');
+                const hasCellTags = chartContent.includes('<c:cell>');
+                
+                addLog(`    📋 Structure XML détectée:`, 'info');
+                addLog(`      - <c:val>: ${hasValTags ? '✅' : '❌'}`, 'info');
+                addLog(`      - <c:v>: ${hasVTags ? '✅' : '❌'}`, 'info');
+                addLog(`      - <c:pt>: ${hasPtTags ? '✅' : '❌'}`, 'info');
+                addLog(`      - <c:cell>: ${hasCellTags ? '✅' : '❌'}`, 'info');
+                
+                // Afficher un échantillon du contenu XML
+                const sampleLength = Math.min(500, chartContent.length);
+                const xmlSample = chartContent.substring(0, sampleLength);
+                addLog(`    📄 Échantillon XML (${sampleLength} caractères):`, 'info');
+                addLog(`      ${xmlSample.replace(/\n/g, ' ').substring(0, 200)}...`, 'info');
+                
+                let modifiedContent = chartContent;
+                
+                // Chercher et remplacer les données AGE dans le XML
+                if (templateData['AGE']) {
+                    addLog(`    📊 Traitement des données AGE: "${templateData['AGE']}"`, 'info');
+                    modifiedContent = await updateChartXmlData(modifiedContent, 'AGE', templateData['AGE']);
+                }
+                
+                // Chercher et remplacer les données CSP dans le XML
+                if (templateData['SOCIO-PRO']) {
+                    addLog(`    📊 Traitement des données CSP: "${templateData['SOCIO-PRO']}"`, 'info');
+                    modifiedContent = await updateChartXmlData(modifiedContent, 'CSP', templateData['SOCIO-PRO']);
+                }
+                
+                // Chercher et remplacer les données PROVENANCE dans le XML
+                if (templateData['PROVENANCE']) {
+                    addLog(`    📊 Traitement des données PROVENANCE: "${templateData['PROVENANCE']}"`, 'info');
+                    modifiedContent = await updateChartXmlData(modifiedContent, 'PROVENANCE', templateData['PROVENANCE']);
+                }
+                
+                // Chercher et remplacer les données GRAPH_PROV dans le XML
+                if (templateData['GRAPH_PROV']) {
+                    addLog(`    📊 Traitement des données GRAPH_PROV: "${templateData['GRAPH_PROV']}"`, 'info');
+                    modifiedContent = await updateChartXmlData(modifiedContent, 'GRAPH_PROV', templateData['GRAPH_PROV']);
+                }
+                
+                addLog(`    ✅ XML du graphique traité`, 'success');
+                return modifiedContent;
+                
+            } catch (error) {
+                addLog(`    ❌ Erreur traitement XML: ${error.message}`, 'error');
+                return chartContent;
+            }
+        }
+
+        // Fonction pour mettre à jour les données dans le XML des graphiques (avec séparation par type)
+        async function updateChartXmlData(xmlContent, chartType, dataString) {
+            try {
+                addLog(`      🔄 MISE À JOUR XML ${chartType}`, 'info');
+                
+                // Parser les données selon le type
+                let values = [];
+                if (chartType === 'AGE') {
+                    const agePattern = /(\d+-\d+ ans(?:\s+ou\s+plus)?): ([\d.]+)%/g;
+                    const ageMatches = [...dataString.matchAll(agePattern)];
+                    values = ageMatches.map(match => parseFloat(match[2]) / 100);
+                } else if (chartType === 'CSP') {
+                    const cspPattern = /([^:]+): ([\d.]+)%/g;
+                    const cspMatches = [...dataString.matchAll(cspPattern)];
+                    values = cspMatches.map(match => parseFloat(match[2]) / 100);
+                } else if (chartType === 'PROVENANCE') {
+                    const provPattern = /(Homme|Femme): ([\d.]+)%/g;
+                    const provMatches = [...dataString.matchAll(provPattern)];
+                    values = provMatches.map(match => parseFloat(match[2]) / 100);
+                } else if (chartType === 'GRAPH_PROV') {
+                    // Parser les données de communes pour GRAPH_PROV
+                    const communePattern = /([^:]+): ([\d.]+)%/g;
+                    const communeMatches = [...dataString.matchAll(communePattern)];
+                    values = communeMatches.map(match => parseFloat(match[2]) / 100);
+                }
+                
+                addLog(`      📊 ${values.length} valeurs à injecter: [${values.map(v => (v * 100).toFixed(1) + '%').join(', ')}]`, 'info');
+                
+                if (values.length === 0) {
+                    addLog(`      ❌ Aucune donnée valide pour ${chartType}`, 'error');
+                    return xmlContent;
+                }
+                
+                let modifiedXml = xmlContent;
+                let totalModifications = 0;
+                
+                // APPROCHE STRICTE: Empêcher le mélange des données en utilisant une validation stricte
+                addLog(`      🔒 VALIDATION STRICTE POUR ÉVITER LE MÉLANGE DES DONNÉES`, 'info');
+                
+                // NOUVELLE APPROCHE: Utiliser le contexte d'appel pour déterminer si ce graphique doit être modifié
+                const shouldModifyChart = shouldModifyThisChart(xmlContent, chartType);
+                addLog(`      🔍 Ce graphique doit-il être modifié pour ${chartType}? ${shouldModifyChart ? 'OUI' : 'NON'}`, 'info');
+                
+                if (!shouldModifyChart) {
+                    addLog(`      🚫 Graphique ignoré - Pas de modification pour éviter le mélange des données`, 'warning');
+                    return xmlContent;
+                }
+                
+                addLog(`      ✅ Graphique validé - Application des données ${chartType}`, 'success');
+                    
+                    // APPROCHE AMÉLIORÉE: Modifier toutes les valeurs <c:v> de manière séquentielle
+                const allValuesPattern = /<c:v>([0-9.]+)<\/c:v>/g;
+                let matchCount = 0;
+                
+                modifiedXml = modifiedXml.replace(allValuesPattern, (match, currentValue) => {
+                    if (matchCount < values.length) {
+                        const newValue = values[matchCount];
+                            addLog(`        ✅ Valeur ${chartType} ${matchCount + 1}: ${currentValue} → ${newValue} (${(newValue * 100).toFixed(1)}%)`, 'success');
+                        matchCount++;
+                        totalModifications++;
+                        return `<c:v>${newValue}</c:v>`;
+                    }
+                    return match;
+                });
+                
+                    // Si pas assez de valeurs trouvées avec <c:v>, essayer avec <c:val>
+                if (totalModifications === 0) {
+                    addLog(`      🔄 Tentative avec les balises <c:val>...`, 'info');
+                    const valPattern = /<c:val>([^<]*)<\/c:val>/g;
+                    matchCount = 0;
+                    
+                    modifiedXml = modifiedXml.replace(valPattern, (match, currentValue) => {
+                        if (matchCount < values.length) {
+                            const newValue = values[matchCount];
+                                addLog(`        ✅ Valeur <c:val> ${chartType} ${matchCount + 1}: ${currentValue} → ${newValue} (${(newValue * 100).toFixed(1)}%)`, 'success');
+                            matchCount++;
+                            totalModifications++;
+                            return `<c:val>${newValue}</c:val>`;
+                        }
+                        return match;
+                    });
+                }
+                
+                addLog(`      📊 ${totalModifications} valeurs XML modifiées au total`, 'info');
+                return modifiedXml;
+                
+            } catch (error) {
+                addLog(`      ❌ Erreur mise à jour XML ${chartType}: ${error.message}`, 'error');
+                return xmlContent;
+            }
+        }
+
+        // Fonction pour détecter le type de graphique dans le XML
+        function detectChartTypeInXml(xmlContent) {
+            try {
+                addLog(`      🔍 ANALYSE DÉTAILLÉE DU XML POUR DÉTECTION DE TYPE`, 'info');
+                
+                // Afficher un échantillon du XML pour debug
+                const sampleLength = Math.min(1000, xmlContent.length);
+                const xmlSample = xmlContent.substring(0, sampleLength);
+                addLog(`      📄 Échantillon XML (${sampleLength} caractères):`, 'info');
+                addLog(`      ${xmlSample.replace(/\n/g, ' ').substring(0, 300)}...`, 'info');
+                
+                // Chercher les identifiants de type de graphique dans le XML
+                if (xmlContent.includes('GRAPH_AGE') || xmlContent.includes('{AGE}')) {
+                    addLog(`      ✅ Identifiant GRAPH_AGE ou {AGE} trouvé`, 'success');
+                    return 'AGE';
+                } else if (xmlContent.includes('GRAPH_CSP') || xmlContent.includes('{SOCIO-PRO}')) {
+                    addLog(`      ✅ Identifiant GRAPH_CSP ou {SOCIO-PRO} trouvé`, 'success');
+                    return 'CSP';
+                } else if (xmlContent.includes('GRAPH_PROVENANCE') || xmlContent.includes('{PROVENANCE}')) {
+                    addLog(`      ✅ Identifiant GRAPH_PROVENANCE ou {PROVENANCE} trouvé`, 'success');
+                    return 'PROVENANCE';
+                }
+                
+                // Chercher des patterns spécifiques dans les labels ou données
+                if (xmlContent.includes('15-24 ans') || xmlContent.includes('25-34 ans') || xmlContent.includes('35-49 ans')) {
+                    addLog(`      ✅ Patterns d'âge détectés dans le XML`, 'success');
+                    return 'AGE';
+                } else if (xmlContent.includes('Agriculteurs') || xmlContent.includes('Cadres') || xmlContent.includes('Employés')) {
+                    addLog(`      ✅ Patterns CSP détectés dans le XML`, 'success');
+                    return 'CSP';
+                } else if (xmlContent.includes('Homme') || xmlContent.includes('Femme')) {
+                    addLog(`      ✅ Patterns de provenance détectés dans le XML`, 'success');
+                    return 'PROVENANCE';
+                }
+                
+                addLog(`      ❌ Aucun pattern de type de graphique détecté`, 'warning');
+                return null; // Type non détecté
+            } catch (error) {
+                addLog(`      ❌ Erreur détection type graphique: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        // Fonction pour déterminer si un graphique doit être modifié (approche stricte)
+        function shouldModifyThisChart(xmlContent, chartType) {
+            try {
+                addLog(`      🔍 ANALYSE STRICTE DU GRAPHIQUE POUR ${chartType}`, 'info');
+                
+                // 1. Chercher des identifiants explicites dans le XML
+                if (chartType === 'AGE' && (xmlContent.includes('GRAPH_AGE') || xmlContent.includes('{AGE}'))) {
+                    addLog(`      ✅ Identifiant AGE explicite trouvé`, 'success');
+                    return true;
+                } else if (chartType === 'CSP' && (xmlContent.includes('GRAPH_CSP') || xmlContent.includes('{SOCIO-PRO}'))) {
+                    addLog(`      ✅ Identifiant CSP explicite trouvé`, 'success');
+                    return true;
+                } else if (chartType === 'PROVENANCE' && (xmlContent.includes('GRAPH_PROVENANCE') || xmlContent.includes('{PROVENANCE}'))) {
+                    addLog(`      ✅ Identifiant PROVENANCE explicite trouvé`, 'success');
+                    return true;
+                } else if (chartType === 'GRAPH_PROV' && (xmlContent.includes('GRAPH_PROV') || xmlContent.includes('{GRAPH_PROV}'))) {
+                    addLog(`      ✅ Identifiant GRAPH_PROV explicite trouvé`, 'success');
+                    return true;
+                }
+                
+                // 2. Chercher des patterns de données spécifiques
+                if (chartType === 'AGE') {
+                    const agePatterns = ['15-24 ans', '25-34 ans', '35-49 ans', '50-64 ans', '65 ans'];
+                    const hasAgePattern = agePatterns.some(pattern => xmlContent.includes(pattern));
+                    if (hasAgePattern) {
+                        addLog(`      ✅ Patterns d'âge détectés dans le XML`, 'success');
+                        return true;
+                    }
+                    // APPROCHE ALTERNATIVE: Si aucun pattern spécifique, permettre la modification pour AGE
+                    addLog(`      ⚠️ Aucun pattern d'âge spécifique trouvé, mais autorisation pour AGE`, 'warning');
+                    return true;
+                } else if (chartType === 'CSP') {
+                    const cspPatterns = ['Agriculteurs', 'Artisans', 'Cadres', 'Employés', 'Ouvriers'];
+                    const hasCspPattern = cspPatterns.some(pattern => xmlContent.includes(pattern));
+                    if (hasCspPattern) {
+                        addLog(`      ✅ Patterns CSP détectés dans le XML`, 'success');
+                        return true;
+                    }
+                    // APPROCHE ALTERNATIVE: Si aucun pattern spécifique, permettre la modification pour CSP
+                    addLog(`      ⚠️ Aucun pattern CSP spécifique trouvé, mais autorisation pour CSP`, 'warning');
+                    return true;
+                } else if (chartType === 'PROVENANCE') {
+                    const provPatterns = ['Homme', 'Femme'];
+                    const hasProvPattern = provPatterns.some(pattern => xmlContent.includes(pattern));
+                    if (hasProvPattern) {
+                        addLog(`      ✅ Patterns de provenance détectés dans le XML`, 'success');
+                        return true;
+                    }
+                    // APPROCHE ALTERNATIVE: Si aucun pattern spécifique, permettre la modification pour PROVENANCE
+                    addLog(`      ⚠️ Aucun pattern de provenance spécifique trouvé, mais autorisation pour PROVENANCE`, 'warning');
+                    return true;
+                } else if (chartType === 'GRAPH_PROV') {
+                    // Chercher des patterns de communes (noms de villes/communes)
+                    const communePatterns = ['Vannes', 'Saint-Avé', 'Séné', 'Ploeren', 'Arradon', 'Plescop', 'Autres'];
+                    const hasCommunePattern = communePatterns.some(pattern => xmlContent.includes(pattern));
+                    if (hasCommunePattern) {
+                        addLog(`      ✅ Patterns de communes détectés dans le XML`, 'success');
+                        return true;
+                    }
+                }
+                
+                // 3. APPROCHE CONSERVATRICE: Si aucun pattern spécifique trouvé, ne pas modifier
+                addLog(`      ❌ Aucun pattern spécifique à ${chartType} trouvé - Graphique ignoré pour éviter le mélange`, 'warning');
+                return false;
+                
+            } catch (error) {
+                addLog(`      ❌ Erreur validation graphique: ${error.message}`, 'error');
+                return false; // En cas d'erreur, ne pas modifier pour éviter les problèmes
+            }
+        }
+
+        // Fonction pour parser les données de la colonne "Réseau"
+        function parseNetworkData(networkString) {
+            try {
+                addLog(`    🔍 PARSING DU RÉSEAU: "${networkString}"`, 'info');
+                
+                // Format attendu: "Vannes - temporaire - 7 jours - flanc_gauche - 40 faces"
+                const parts = networkString.split(' - ');
+                
+                if (parts.length >= 5) {
+                    const ville = parts[0].trim();
+                    const type = parts[1].trim(); // temporaire
+                    const duree = parts[2].trim(); // 7 jours ou 14 jours
+                    const face = parts[3].trim(); // flanc_gauche, flanc_droit, arriere
+                    const faces = parts[4].trim(); // 40 faces
+                    
+                    // Calculer la semaine (pour l'instant, on utilise la semaine actuelle)
+                    const currentWeek = getCurrentWeek();
+                    
+                    // Normaliser les noms de face
+                    const normalizedFace = normalizeFaceName(face);
+                    
+                    return {
+                        ville: ville,
+                        type: type,
+                        duree: duree,
+                        face: normalizedFace,
+                        faces: faces,
+                        semaine: currentWeek,
+                        original: networkString
+                    };
+                } else {
+                    addLog(`    ⚠️ Format réseau non reconnu: ${networkString}`, 'warning');
+                    return {
+                        ville: 'Inconnue',
+                        type: 'standard',
+                        duree: '7 jours',
+                        face: 'standard',
+                        faces: 'standard',
+                        semaine: getCurrentWeek(),
+                        original: networkString
+                    };
+                }
+            } catch (error) {
+                addLog(`    ❌ Erreur parsing réseau: ${error.message}`, 'error');
+                return {
+                    ville: 'Erreur',
+                    type: 'standard',
+                    duree: '7 jours',
+                    face: 'standard',
+                    faces: 'standard',
+                    semaine: getCurrentWeek(),
+                    original: networkString
+                };
+            }
+        }
+
+        // Fonction pour normaliser les noms de face
+        function normalizeFaceName(face) {
+            const faceMap = {
+                'flanc_gauche': 'Flanc Gauche',
+                'flanc_droit': 'Flanc Droit',
+                'arriere': 'Arrière',
+                'flanc gauche': 'Flanc Gauche',
+                'flanc droit': 'Flanc Droit',
+                'arrière': 'Arrière'
+            };
+            
+            const normalized = faceMap[face.toLowerCase()] || face;
+            addLog(`    🔄 Face normalisée: "${face}" → "${normalized}"`, 'info');
+            return normalized;
+        }
+
+        // Fonction pour calculer la semaine actuelle
+        function getCurrentWeek() {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), 0, 1);
+            const days = Math.floor((now - start) / (24 * 60 * 60 * 1000));
+            const weekNumber = Math.ceil((days + start.getDay() + 1) / 7);
+            return Math.min(weekNumber, 52); // Max 52 semaines
+        }
+
+        // Fonction pour créer la hiérarchie de dossiers
+        function createFileHierarchy(networkData, fileName) {
+            try {
+                // Structure: SEMAINE/VILLE/FACE/VERSION/fichier
+                const semaine = `Semaine ${networkData.semaine}`;
+                const ville = networkData.ville;
+                const face = networkData.face;
+                const version = networkData.duree === '7 jours' ? 'Version 7 jours' : 'Version 14 jours';
+                
+                const filePath = `${semaine}/${ville}/${face}/${version}/${fileName}`;
+                
+                addLog(`    📁 Chemin créé: ${filePath}`, 'info');
+                return filePath;
+                
+            } catch (error) {
+                addLog(`    ❌ Erreur création hiérarchie: ${error.message}`, 'error');
+                return fileName; // Fallback
+            }
+        }
+
+        // Fonction pour traiter les graphiques dans les slides (fallback)
+        async function processChartsInSlides(zip, templateData) {
+            try {
+                addLog('📊 RECHERCHE DES GRAPHIQUES DANS LES SLIDES', 'info');
+                
+                const slideFiles = [];
+                zip.forEach((relativePath, file) => {
+                    if (relativePath.includes('slides/slide') && relativePath.endsWith('.xml')) {
+                        slideFiles.push(relativePath);
+                    }
+                });
+                
+                addLog(`📋 ${slideFiles.length} slides à analyser`, 'info');
+                
+                let graphiquesTrouves = 0;
+                
+                for (const slideFile of slideFiles) {
+                    try {
+                        const slideContent = await zip.file(slideFile).async('string');
+                        
+                        if (slideContent.includes('GRAPH_AGE') || slideContent.includes('GRAPH_CSP') || slideContent.includes('GRAPH_PROVENANCE')) {
+                            addLog(`  ✅ Graphiques trouvés dans ${slideFile}`, 'success');
+                            
+                            // Modifier le contenu XML de la slide
+                            const modifiedContent = await processChartXmlContent(slideContent, templateData);
+                            
+                            if (modifiedContent !== slideContent) {
+                                zip.file(slideFile, modifiedContent);
+                                addLog(`  ✅ Slide modifiée: ${slideFile}`, 'success');
+                                graphiquesTrouves++;
+                            }
+                        }
+                    } catch (error) {
+                        addLog(`  ⚠️ Erreur slide ${slideFile}: ${error.message}`, 'warning');
+                    }
+                }
+                
+                return graphiquesTrouves;
+                
+            } catch (error) {
+                addLog(`❌ Erreur traitement slides: ${error.message}`, 'error');
+                return 0;
+            }
+        }
+
+        // Fonction pour traiter les fichiers Excel embarqués (version XML)
+        async function processEmbeddedExcelChart(zip, chartFile, templateData) {
+            try {
+                addLog(`  📊 TRAITEMENT VIA XML: ${chartFile}`, 'info');
+                addLog(`  📊 Données disponibles: AGE="${templateData['AGE']}", SOCIO-PRO="${templateData['SOCIO-PRO']}", PROVENANCE="${templateData['PROVENANCE']}"`, 'info');
+                
+                // Cette fonction est maintenant gérée par processEmbeddedCharts via XML
+                addLog(`  ✅ Traitement XML effectué dans processEmbeddedCharts`, 'success');
+                return true;
+                
+            } catch (error) {
+                addLog(`  ❌ Erreur traitement graphique ${chartFile}: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        // Fonction pour forcer la mise à jour des graphiques dans PowerPoint
+        async function forceChartRefresh(zip, chartFile) {
+            try {
+                addLog(`    🔄 FORCE LA MISE À JOUR DES GRAPHIQUES...`, 'info');
+                
+                // Parcourir les slides pour trouver les graphiques liés à ce fichier Excel
+                const slideFiles = [];
+                zip.forEach((relativePath, file) => {
+                    if (relativePath.includes('slides/slide') && relativePath.endsWith('.xml')) {
+                        slideFiles.push(relativePath);
+                    }
+                });
+                
+                addLog(`    📋 ${slideFiles.length} slides à analyser pour forcer la mise à jour`, 'info');
+                
+                for (const slideFile of slideFiles) {
+                    try {
+                        const slideContent = await zip.file(slideFile).async('string');
+                        
+                        // Chercher les références à ce fichier Excel dans la slide
+                        if (slideContent.includes(chartFile) || slideContent.includes('embeddings/') || 
+                            slideContent.includes('GRAPH_AGE') || slideContent.includes('GRAPH_CSP') || 
+                            slideContent.includes('GRAPH_PROVENANCE')) {
+                            addLog(`      📊 Graphique trouvé dans ${slideFile}`, 'info');
+                            
+                            // Modifier le contenu XML pour forcer la mise à jour
+                            let modifiedSlideContent = slideContent;
+                            
+                            // 1. Ajouter un timestamp pour forcer la mise à jour
+                            const timestamp = Date.now();
+                            modifiedSlideContent = modifiedSlideContent.replace(
+                                /<c:chart xmlns:c="http:\/\/schemas\.openxmlformats\.org\/drawingml\/2006\/chart">/g,
+                                `<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" refresh="${timestamp}">`
+                            );
+                            
+                            // 2. Forcer la mise à jour des données
+                            modifiedSlideContent = modifiedSlideContent.replace(
+                                /<c:externalData r:id="[^"]*"/g,
+                                `<c:externalData r:id="rId1" autoUpdate="1"`
+                            );
+                            
+                            // 3. NOUVELLE APPROCHE: Modifier les métadonnées du graphique
+                            modifiedSlideContent = modifiedSlideContent.replace(
+                                /<c:autoUpdate val="0"/g,
+                                `<c:autoUpdate val="1"`
+                            );
+                            
+                            // 4. Ajouter des attributs de rafraîchissement
+                            modifiedSlideContent = modifiedSlideContent.replace(
+                                /<c:chart>/g,
+                                `<c:chart autoUpdate="1" refresh="${timestamp}">`
+                            );
+                            
+                            // 5. Modifier les relations pour forcer le rechargement
+                            modifiedSlideContent = modifiedSlideContent.replace(
+                                /<Relationship Id="[^"]*" Type="http:\/\/schemas\.openxmlformats\.org\/officeDocument\/2006\/relationships\/oleObject"/g,
+                                `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject"`
+                            );
+                            
+                            if (modifiedSlideContent !== slideContent) {
+                                zip.file(slideFile, modifiedSlideContent);
+                                addLog(`      ✅ Slide ${slideFile} mise à jour pour forcer le rafraîchissement`, 'success');
+                                addLog(`      🔧 Timestamp ajouté: ${timestamp}`, 'info');
+                            }
+                        }
+                    } catch (error) {
+                        addLog(`      ⚠️ Erreur mise à jour slide ${slideFile}: ${error.message}`, 'warning');
+                    }
+                }
+                
+                // NOUVELLE APPROCHE: Modifier le fichier de relations
+                await forceChartRelationsUpdate(zip);
+                
+                // NOUVELLE APPROCHE: Créer un fichier de métadonnées pour forcer le rechargement
+                await createChartMetadataFile(zip);
+                
+                addLog(`    ✅ MISE À JOUR DES GRAPHIQUES FORCÉE`, 'success');
+                
+            } catch (error) {
+                addLog(`    ❌ Erreur force mise à jour graphiques: ${error.message}`, 'error');
+            }
+        }
+
+        // Fonction pour créer un fichier de métadonnées pour forcer le rechargement
+        async function createChartMetadataFile(zip) {
+            try {
+                addLog(`    🔄 CRÉATION FICHIER MÉTADONNÉES...`, 'info');
+                
+                const timestamp = Date.now();
+                const metadataContent = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject" 
+                  Target="embeddings/Microsoft_Excel_Worksheet1.xlsx" 
+                  autoUpdate="1" 
+                  refresh="${timestamp}"/>
+    <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject" 
+                  Target="embeddings/Microsoft_Excel_Worksheet2.xlsx" 
+                  autoUpdate="1" 
+                  refresh="${timestamp}"/>
+</Relationships>`;
+                
+                // Ajouter le fichier de métadonnées
+                zip.file('embeddings/_rels/chart_metadata.rels', metadataContent);
+                addLog(`      ✅ Fichier métadonnées créé avec timestamp ${timestamp}`, 'success');
+                
+                // Créer aussi un fichier de cache pour forcer le rechargement
+                const cacheContent = `<?xml version="1.0" encoding="UTF-8"?>
+<ChartCache xmlns="http://schemas.microsoft.com/office/powerpoint/2010/main">
+    <LastModified>${timestamp}</LastModified>
+    <AutoUpdate>true</AutoUpdate>
+    <RefreshOnOpen>true</RefreshOnOpen>
+</ChartCache>`;
+                
+                zip.file('embeddings/chart_cache.xml', cacheContent);
+                addLog(`      ✅ Fichier cache créé`, 'success');
+                
+            } catch (error) {
+                addLog(`    ❌ Erreur création métadonnées: ${error.message}`, 'error');
+            }
+        }
+
+        // Fonction pour forcer la mise à jour des relations des graphiques
+        async function forceChartRelationsUpdate(zip) {
+            try {
+                addLog(`    🔄 FORCE LA MISE À JOUR DES RELATIONS...`, 'info');
+                
+                // Modifier le fichier de relations des slides
+                const relFiles = [];
+                zip.forEach((relativePath, file) => {
+                    if (relativePath.includes('slides/_rels/slide') && relativePath.endsWith('.rels')) {
+                        relFiles.push(relativePath);
+                    }
+                });
+                
+                addLog(`    📋 ${relFiles.length} fichiers de relations à analyser`, 'info');
+                
+                for (const relFile of relFiles) {
+                    try {
+                        const relContent = await zip.file(relFile).async('string');
+                        
+                        if (relContent.includes('oleObject') || relContent.includes('embeddings/')) {
+                            addLog(`      📊 Relations de graphiques trouvées dans ${relFile}`, 'info');
+                            
+                            let modifiedRelContent = relContent;
+                            
+                            // Modifier les relations pour forcer le rechargement
+                            modifiedRelContent = modifiedRelContent.replace(
+                                /<Relationship Id="[^"]*" Type="http:\/\/schemas\.openxmlformats\.org\/officeDocument\/2006\/relationships\/oleObject" Target="[^"]*"/g,
+                                `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject" Target="../embeddings/Microsoft_Excel_Worksheet1.xlsx"`
+                            );
+                            
+                            if (modifiedRelContent !== relContent) {
+                                zip.file(relFile, modifiedRelContent);
+                                addLog(`      ✅ Relations ${relFile} mises à jour`, 'success');
+                            }
+                        }
+                    } catch (error) {
+                        addLog(`      ⚠️ Erreur relations ${relFile}: ${error.message}`, 'warning');
+                    }
+                }
+                
+                addLog(`    ✅ RELATIONS MISE À JOUR`, 'success');
+                
+            } catch (error) {
+                addLog(`    ❌ Erreur mise à jour relations: ${error.message}`, 'error');
+            }
+        }
+
+        // Fonction pour formater les nombres avec des espaces
+        function formatNumberWithSpaces(value) {
+            try {
+                const num = parseFloat(value);
+                if (isNaN(num)) return '0';
+                return Math.round(num).toLocaleString('fr-FR');
+            } catch (error) {
+                return '0';
+            }
+        }
+
+        // Fonction pour créer le template email
+        function createEmailTemplate(row, networkName) {
+            try {
+                // Récupérer le template personnalisé de l'utilisateur
+                const customTemplate = document.getElementById('emailTemplateEditor').value;
+                
+                // Récupérer les données de la ligne
+                const city = row['Ville'] || 'Ville';
+                const periode = row['Période'] || 'période';
+                const audience = row['Audience Cible'] || '0';
+                const odv = row['ODV Total'] || '0';
+                const reponse = row['Réponse'] || '0';
+                
+                // Calculer le numéro de semaine (même logique que dans PowerPoint)
+                const now = new Date();
+                const startOfYear = new Date(now.getFullYear(), 0, 1);
+                const pastDaysOfYear = (now - startOfYear) / 86400000;
+                const weekNumber = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
+                
+                // Formater les données avec le même algorithme que PowerPoint
+                const cityFormatted = city.toUpperCase();
+                const audienceFormatted = formatNumberWithSpaces(audience);
+                const odvFormatted = formatNumberWithSpaces(odv);
+                const reponseFormatted = formatNumberWithSpaces(reponse);
+                
+                // Utiliser le même formatage de date que PowerPoint
+                const periodeFormatted = formatDateForEmail(periode);
+                
+                // Remplacer les variables dans le template personnalisé
+                let emailTemplate = customTemplate
+                    .replace(/\{VILLE\}/g, cityFormatted)
+                    .replace(/\{PERIODE\}/g, periodeFormatted)
+                    .replace(/\{AUDIENCE\}/g, audienceFormatted)
+                    .replace(/\{ODV\}/g, odvFormatted)
+                    .replace(/\{REPONSE\}/g, reponseFormatted)
+                    .replace(/\{NB_SEMAINE\}/g, weekNumber);
+                
+                // Si le template est vide, utiliser le template par défaut
+                if (!customTemplate.trim()) {
+                    emailTemplate = `Bonjour,
+Vous trouverez ci-joint le bilan complet de votre campagne menée sur les bus de ${cityFormatted} ${periodeFormatted}.
+Durant cette période (semaine ${weekNumber}), vous avez touché une audience de ${audienceFormatted} personnes et votre campagne a généré plus de ${odvFormatted} contacts.
+Parcourez le document en pièce jointe pour connaître les indicateurs clés de votre campagne et le profil de votre audience.
+Bien à vous,
+
+`;
+                }
+                
+                return emailTemplate;
+                
+            } catch (error) {
+                addLog(`❌ Erreur création template email: ${error.message}`, 'error');
+                return `Bonjour,
+Vous trouverez ci-joint le bilan complet de votre campagne.
+Bien à vous,
+
+`;
+            }
+        }
+
+        // Fonction pour formater les dates dans les emails (même algorithme que PowerPoint)
+        function formatDateForEmail(dateStr) {
+            if (!dateStr) return '';
+            const match = dateStr.match(/du (\d{4}-\d{2}-\d{2}) au (\d{4}-\d{2}-\d{2})/i);
+            if (!match) return dateStr;
+            
+            const [, startDate, endDate] = match;
+            
+            function formatSingleDate(date) {
+                const [year, month, day] = date.split('-');
+                const months = [
+                    'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+                    'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+                ];
+                return `${parseInt(day)} ${months[parseInt(month) - 1]} ${year}`;
+            }
+            
+            return `du ${formatSingleDate(startDate)} au ${formatSingleDate(endDate)}`;
+        }
+
+        // Fonction supprimée - plus d'Excel, uniquement XML
+
+        // ANCIENNE FONCTION SUPPRIMÉE - REMPLACÉE PAR updateAgeChartDataDirect
+
+        // Fonction supprimée - maintenant gérée par le traitement XML
+
+        // Fonction supprimée - maintenant gérée par le traitement XML
+
+        // ANCIENNES FONCTIONS SUPPRIMÉES - REMPLACÉES PAR LES FONCTIONS Direct
+
+        // FONCTION SUPPRIMÉE - Plus utilisée avec l'approche Direct
+
+        // Gestion du bouton Documentation
+        document.getElementById('docBtn').addEventListener('click', function() {
+            showDocumentation();
+        });
+
+        // Gestion des fichiers sélectionnés
+        document.getElementById('excelFile').addEventListener('change', function(e) {
+            const label = document.getElementById('excelLabel');
+            const span = label.querySelector('span');
+            if (e.target.files.length > 0) {
+                span.textContent = e.target.files[0].name;
+                label.classList.add('has-file');
+            } else {
+                span.textContent = 'Sélectionner un fichier Excel (.xlsx, .xls)';
+                label.classList.remove('has-file');
+            }
+        });
+
+        document.getElementById('powerpointFile').addEventListener('change', function(e) {
+            const label = document.getElementById('powerpointLabel');
+            const span = label.querySelector('span');
+            if (e.target.files.length > 0) {
+                span.textContent = e.target.files[0].name;
+                label.classList.add('has-file');
+            } else {
+                span.textContent = 'Sélectionner un fichier PowerPoint (.pptx, .ppt)';
+                label.classList.remove('has-file');
+            }
+        });
+
+        // Fonctions pour l'écran de chargement PowerPoint
+        function showPptLoadingScreen() {
+            document.getElementById('pptLoadingScreen').classList.add('active');
+            document.getElementById('loadingScreen').classList.remove('active');
+            document.getElementById('formContainer').classList.add('hidden');
+        }
+
+        function hidePptLoadingScreen() {
+            document.getElementById('pptLoadingScreen').classList.remove('active');
+            document.getElementById('formContainer').classList.remove('hidden');
+        }
+
+        function updatePptProgress(current, total, status = '') {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const pptStatus = document.getElementById('pptStatus');
+            
+            const percentage = total > 0 ? (current / total) * 100 : 0;
+            
+            progressBar.style.width = `${percentage}%`;
+            progressText.textContent = `${current}/${total} fichiers traités`;
+            
+            // Calculer l'estimation du temps restant avec produit en croix
+            let timeEstimation = '';
+            if (current > 0 && total > current) {
+                const elapsed = Date.now() - processingStartTime;
+                const avgTimePerFile = elapsed / current;
+                const remainingFiles = total - current;
+                const estimatedRemainingMs = remainingFiles * avgTimePerFile;
+                timeEstimation = `Temps restant estimé : ${formatTime(estimatedRemainingMs)}`;
+            } else if (current === total) {
+                timeEstimation = 'Finalisation en cours...';
+            } else {
+                timeEstimation = 'Calcul en cours...';
+            }
+            
+            if (pptStatus) {
+                pptStatus.textContent = timeEstimation;
+            }
+            
+            if (current > 0 && current < total) {
+                progressBar.style.boxShadow = `0 0 15px rgba(162, 19, 123, 0.7)`;
+                setTimeout(() => {
+                    progressBar.style.boxShadow = `0 0 10px rgba(162, 19, 123, 0.5)`;
+                }, 300);
+            }
+        }
+
+        async function processFilesLocally(excelFile, powerpointFile, outputPrefix, emailDestination) {
+            try {
+                addLog('Début du traitement local des fichiers', 'info');
+                addLog(`Excel: ${excelFile.name}`, 'info');
+                addLog(`PowerPoint: ${powerpointFile.name}`, 'info');
+                addLog(`Email destination: ${emailDestination}`, 'info');
+                
+                showPptLoadingScreen();
+
+                // 1. Lire le fichier Excel
+                addLog('Lecture du fichier Excel...', 'info');
+                const excelData = await readExcelFile(excelFile);
+                
+                // 2. Trouver la sheet "Performance média"
+                const performanceSheet = excelData.Sheets['Performance média'];
+                if (!performanceSheet) {
+                    throw new Error('Sheet "Performance média" non trouvée dans le fichier Excel');
+                }
+
+                // 3. Convertir en JSON pour traitement
+                const jsonData = XLSX.utils.sheet_to_json(performanceSheet);
+                addLog('Sheet "Performance média" trouvée', 'success');
+                addLog(`${jsonData.length} lignes trouvées dans Performance média`, 'info');
+
+                // 4. Limiter à 3 lignes pour le debug
+                const maxRows = Math.min(3, jsonData.length); // Limiter à 3 lignes pour le debug
+                initializeTimeEstimation(maxRows);
+                addLog(`🔧 DEBUG: Traitement limité à ${maxRows} lignes (mode debug)`, 'warning');
+                addLog(`Estimation du temps initialisée pour ${maxRows} fichiers`, 'info');
+                
+                if (jsonData.length > 0) {
+                    const columns = Object.keys(jsonData[0]);
+                    addLog(`Colonnes disponibles: ${columns.join(', ')}`, 'info');
+                }
+
+                // 4. Lire la sheet "Audience" pour les données démographiques
+                const audienceSheet = excelData.Sheets['Audience'];
+                if (audienceSheet) {
+                    addLog('✅ Sheet "Audience" trouvée', 'success');
+                } else {
+                    addLog('⚠️ Sheet "Audience" non trouvée - les données démographiques ne seront pas disponibles', 'warning');
+                }
+
+                // 4.1. Lire la sheet "Provenance" pour les données de provenance (communes)
+                const provenanceSheet = excelData.Sheets['Provenance'];
+                if (provenanceSheet) {
+                    addLog('✅ Sheet "Provenance" trouvée', 'success');
+                } else {
+                    addLog('⚠️ Sheet "Provenance" non trouvée - les données de provenance ne seront pas disponibles', 'warning');
+                }
+
+                // 5. Lire le fichier PowerPoint template
+                addLog('📖 Lecture du fichier PowerPoint template...', 'info');
+                
+                if (typeof JSZip === 'undefined') {
+                    throw new Error('JSZip n\'est pas chargé. Vérifiez la connexion internet.');
+                }
+                
+                const templateArrayBuffer = await powerpointFile.arrayBuffer();
+                addLog('Template PowerPoint lu', 'success');
+
+                // 6. Traiter les 3 premières lignes (debug) - maxRows déjà défini plus haut
+                addLog(`Traitement des ${maxRows} premières lignes (mode debug)...`, 'info');
+
+                updatePptProgress(0, maxRows, 'Préparation des données...');
+
+                const results = [];
+                const allFiles = []; // Collecter tous les fichiers pour le ZIP final
+
+                for (let i = 0; i < maxRows; i++) {
+                    currentRow = i + 1; // Mettre à jour le compteur global
+                    const row = jsonData[i];
+                    const networkName = row['réseau'] || row['Réseau'] || `ligne_${i + 1}`;
+                    addLog(`Traitement ligne ${i + 1}: ${networkName}`, 'info');
+                    
+                    updatePptProgress(i, maxRows);
+
+                    try {
+                        addLog(`  Traitement du template pour ligne ${i + 1}`, 'info');
+                        
+                        const zip = await JSZip.loadAsync(templateArrayBuffer);
+                        
+                        // Mapping des données avec formatage
+                        const mapping = {
+                            'ODV Total': 'ODV',
+                            'GRP': 'GRP',
+                            'Répetition Cible': 'TIMES',
+                            'ODV Cible': 'VIEWS',
+                            'Couverture Cible': 'POP',
+                            'Période': 'DATE',
+                            'Ville': 'CITY',
+                            'Audience Cible': 'AUDIENCE',
+                            'NB_SEMAINE': 'NB_SEMAINE'
+                        };
+
+                        // Fonctions de formatage
+                        function formatNumber(value, type) {
+                            if (!value && value !== 0) return '';
+                            const num = parseFloat(value);
+                            if (isNaN(num)) return value;
+                            
+                            function addSpaces(number) {
+                                return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+                            }
+                            
+                            switch(type) {
+                                case 'ROUND_UP':
+                                    return addSpaces(Math.ceil(num));
+                                case 'ONE_DECIMAL':
+                                    const decimal = num.toFixed(1);
+                                    const [integer, fraction] = decimal.split('.');
+                                    return addSpaces(integer) + '.' + fraction;
+                                case 'PERCENTAGE':
+                                    return addSpaces((num * 100).toFixed(0)) + '%';
+                                default:
+                                    return value;
+                            }
+                        }
+                        
+                        function formatDate(dateStr) {
+                            if (!dateStr) return '';
+                            const match = dateStr.match(/du (\d{4}-\d{2}-\d{2}) au (\d{4}-\d{2}-\d{2})/i);
+                            if (!match) return dateStr;
+                            
+                            const [, startDate, endDate] = match;
+                            
+                            function formatSingleDate(date) {
+                                const [year, month, day] = date.split('-');
+                                const months = [
+                                    'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+                                    'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+                                ];
+                                return `${parseInt(day)} ${months[parseInt(month) - 1]} ${year}`;
+                            }
+                            
+                            return `du ${formatSingleDate(startDate)} au ${formatSingleDate(endDate)}`;
+                        }
+
+                        // Préparer les données pour le remplacement
+                        const templateData = {};
+                        let replacementsCount = 0;
+                        
+                        // Calculer le numéro de semaine actuelle
+                        const now = new Date();
+                        const startOfYear = new Date(now.getFullYear(), 0, 1);
+                        const pastDaysOfYear = (now - startOfYear) / 86400000;
+                        const weekNumber = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
+                        
+                        // S'assurer que NB_SEMAINE est bien ajouté et formaté comme string
+                        templateData['NB_SEMAINE'] = weekNumber.toString();
+                        addLog(`    📅 Numéro de semaine calculé: ${weekNumber}`, 'info');
+                        addLog(`    🔍 DEBUG: NB_SEMAINE ajouté au templateData: "${templateData['NB_SEMAINE']}"`, 'info');
+                        
+                        for (const [excelColumn, templateKey] of Object.entries(mapping)) {
+                            if (row[excelColumn] !== undefined && row[excelColumn] !== null) {
+                                let value = row[excelColumn];
+                                let formattedValue;
+                                
+                                switch(templateKey) {
+                                    case 'ODV': formattedValue = formatNumber(value, 'ROUND_UP'); break;
+                                    case 'GRP': formattedValue = formatNumber(value, 'ROUND_UP'); break;
+                                    case 'TIMES': formattedValue = formatNumber(value, 'ONE_DECIMAL'); break;
+                                    case 'VIEWS': formattedValue = formatNumber(value, 'ROUND_UP'); break;
+                                    case 'POP': formattedValue = formatNumber(value, 'PERCENTAGE'); break;
+                                    case 'DATE': formattedValue = formatDate(value); break;
+                                    case 'CITY': formattedValue = String(value).toUpperCase(); break;
+                                    case 'AUDIENCE': formattedValue = formatNumber(value, 'ROUND_UP'); break;
+                                    default: formattedValue = String(value);
+                                }
+                                
+                                templateData[templateKey] = formattedValue;
+                                addLog(`    🔄 ${excelColumn} → {${templateKey}} = ${formattedValue}`, 'info');
+                                replacementsCount++;
+                            } else {
+                                templateData[templateKey] = '';
+                                addLog(`    ⚠️ Colonne "${excelColumn}" non trouvée pour {${templateKey}}`, 'warning');
+                            }
+                        }
+
+                        // Ajouter les données démographiques depuis la feuille Audience
+                        if (audienceSheet) {
+                            addLog(`  📊 Lecture des données démographiques...`, 'info');
+                            
+                            const currentPeriod = row['Période'];
+                            let audienceRowIndex = -1;
+                            
+                            for (let audienceRow = 2; audienceRow <= 100; audienceRow++) {
+                                const audienceDateCell = audienceSheet[`A${audienceRow}`];
+                                if (audienceDateCell && audienceDateCell.v === currentPeriod) {
+                                    audienceRowIndex = audienceRow;
+                                    addLog(`  ✅ Ligne Audience trouvée: ${audienceRow}`, 'success');
+                                    break;
+                                }
+                            }
+                            
+                            if (audienceRowIndex !== -1) {
+                                // CORRECTION: Données AGE (colonnes C à G) - VRAIES DONNÉES AGE
+                                const ageColumns = ['C', 'D', 'E', 'F', 'G'];
+                                const ageLabels = ['15-24 ans', '25-34 ans', '35-49 ans', '50-64 ans', '65 ans ou plus'];
+                                const ageData = [];
+                                
+                                addLog(`    📊 MAPPING DONNÉES AGE RÉELLES depuis Audience ligne ${audienceRowIndex}`, 'info');
+                                addLog(`    🔍 Colonnes AGE utilisées: ${ageColumns.join(', ')}`, 'info');
+                                for (let j = 0; j < ageColumns.length; j++) {
+                                    const cellRef = `${ageColumns[j]}${audienceRowIndex}`;
+                                    const cell = audienceSheet[cellRef];
+                                    if (cell && cell.v !== undefined) {
+                                        // Vérifier si la valeur est déjà en pourcentage ou en décimal
+                                        const cellValue = cell.v;
+                                        const percentageValue = cellValue > 1 ? cellValue.toFixed(1) : (cellValue * 100).toFixed(1);
+                                        ageData.push(`${ageLabels[j]}: ${percentageValue}%`);
+                                        addLog(`      📊 ${ageLabels[j]}: ${percentageValue}% (cellule ${cellRef})`, 'info');
+                                    } else {
+                                        addLog(`      ❌ Cellule ${cellRef} vide ou invalide`, 'warning');
+                                    }
+                                }
+                                templateData['AGE'] = ageData.join(', ');
+                                addLog(`    ✅ Données AGE finales: "${templateData['AGE']}"`, 'success');
+                                
+                                // CORRECTION: Données CSP (colonnes H à P) - VRAIES DONNÉES CSP
+                                const cspColumns = ['H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P'];
+                                const cspLabels = ['Agriculteurs', 'Artisans', 'Autres', 'Cadres', 'Étudiants', 'Employés', 'Ouvriers', 'Professions intermédiaires', 'Retraités'];
+                                const cspData = [];
+                                
+                                addLog(`    📊 MAPPING DONNÉES CSP RÉELLES depuis Audience ligne ${audienceRowIndex}`, 'info');
+                                addLog(`    🔍 Colonnes CSP utilisées: ${cspColumns.join(', ')}`, 'info');
+                                for (let j = 0; j < cspColumns.length; j++) {
+                                    const cellRef = `${cspColumns[j]}${audienceRowIndex}`;
+                                    const cell = audienceSheet[cellRef];
+                                    if (cell && cell.v !== undefined) {
+                                        // Vérifier si la valeur est déjà en pourcentage ou en décimal
+                                        const cellValue = cell.v;
+                                        const percentageValue = cellValue > 1 ? cellValue.toFixed(1) : (cellValue * 100).toFixed(1);
+                                        cspData.push(`${cspLabels[j]}: ${percentageValue}%`);
+                                        addLog(`      📊 ${cspLabels[j]}: ${percentageValue}% (cellule ${cellRef})`, 'info');
+                                    } else {
+                                        addLog(`      ❌ Cellule ${cellRef} vide ou invalide`, 'warning');
+                                    }
+                                }
+                                templateData['SOCIO-PRO'] = cspData.join(', ');
+                                addLog(`    ✅ Données CSP finales: "${templateData['SOCIO-PRO']}"`, 'success');
+                                
+                                // Données PROVENANCE (colonnes Q et R) - SEXE (pour compatibilité)
+                                const menCell = audienceSheet[`Q${audienceRowIndex}`];
+                                const womenCell = audienceSheet[`R${audienceRowIndex}`];
+                                
+                                addLog(`    📊 MAPPING DONNÉES PROVENANCE (SEXE) depuis Audience ligne ${audienceRowIndex}`, 'info');
+                                if (menCell && womenCell && menCell.v !== undefined && womenCell.v !== undefined) {
+                                    // Vérifier si les valeurs sont déjà en pourcentage ou en décimal
+                                    const menValue = menCell.v;
+                                    const womenValue = womenCell.v;
+                                    
+                                    // Si la valeur est > 1, elle est déjà en pourcentage, sinon c'est un décimal
+                                    const menPercentage = menValue > 1 ? menValue.toFixed(1) : (menValue * 100).toFixed(1);
+                                    const womenPercentage = womenValue > 1 ? womenValue.toFixed(1) : (womenValue * 100).toFixed(1);
+                                    templateData['PROVENANCE'] = `Homme: ${menPercentage}%, Femme: ${womenPercentage}%`;
+                                    templateData['MEN'] = `${menPercentage}%`;
+                                    templateData['WOMEN'] = `${womenPercentage}%`;
+                                    addLog(`      📊 Homme: ${menPercentage}% (cellule Q${audienceRowIndex})`, 'info');
+                                    addLog(`      📊 Femme: ${womenPercentage}% (cellule R${audienceRowIndex})`, 'info');
+                                    addLog(`    ✅ Données PROVENANCE finales: "${templateData['PROVENANCE']}"`, 'success');
+                                }
+                                
+                                // NOUVELLE LOGIQUE: Données PROVENANCE (COMMUNES) depuis la feuille Provenance
+                                if (provenanceSheet) {
+                                    addLog(`    📊 MAPPING DONNÉES PROVENANCE (COMMUNES) depuis feuille Provenance`, 'info');
+                                    
+                                    // Trouver la ligne correspondante à la période dans la feuille Provenance
+                                    let provenanceRowIndex = -1;
+                                    for (let provRow = 2; provRow <= 100; provRow++) {
+                                        const provDateCell = provenanceSheet[`A${provRow}`];
+                                        if (provDateCell && provDateCell.v === currentPeriod) {
+                                            provenanceRowIndex = provRow;
+                                            addLog(`  ✅ Ligne Provenance trouvée: ${provRow}`, 'success');
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if (provenanceRowIndex !== -1) {
+                                        // Lire les en-têtes des communes (ligne 2, à partir de C2)
+                                        const communeHeaders = [];
+                                        for (let col = 'C'; col <= 'Z'; col++) {
+                                            const headerCell = provenanceSheet[`${col}2`];
+                                            if (headerCell && headerCell.v && headerCell.v.toString().trim() !== '') {
+                                                communeHeaders.push({
+                                                    column: col,
+                                                    name: headerCell.v.toString().trim()
+                                                });
+                                            } else {
+                                                break; // Arrêter si on trouve une cellule vide
+                                            }
+                                        }
+                                        
+                                        addLog(`    📊 ${communeHeaders.length} communes trouvées: ${communeHeaders.map(c => c.name).join(', ')}`, 'info');
+                                        
+                                        if (communeHeaders.length > 0) {
+                                            // Lire les données pour cette période
+                                            const communeData = [];
+                                            for (const commune of communeHeaders) {
+                                                const dataCell = provenanceSheet[`${commune.column}${provenanceRowIndex}`];
+                                                if (dataCell && dataCell.v !== undefined) {
+                                                    const percentage = (dataCell.v * 100).toFixed(1);
+                                                    communeData.push({
+                                                        name: commune.name,
+                                                        percentage: parseFloat(percentage)
+                                                    });
+                                                }
+                                            }
+                                            
+                                            // Trier par pourcentage décroissant
+                                            communeData.sort((a, b) => b.percentage - a.percentage);
+                                            
+                                            // Prendre les 6 premières communes + calculer "Autres" (debug)
+                                            const top6Communes = communeData.slice(0, 6);
+                                            const otherCommunes = communeData.slice(6);
+                                            const otherPercentage = otherCommunes.reduce((sum, commune) => sum + commune.percentage, 0);
+                                            
+                                            // Construire la chaîne de données pour GRAPH_PROV
+                                            const provenanceData = [];
+                                            top6Communes.forEach(commune => {
+                                                provenanceData.push(`${commune.name}: ${commune.percentage}%`);
+                                            });
+                                            
+                                            if (otherPercentage > 0) {
+                                                provenanceData.push(`Autres: ${otherPercentage.toFixed(1)}%`);
+                                            }
+                                            
+                                            templateData['GRAPH_PROV'] = provenanceData.join(', ');
+                                            addLog(`    ✅ Données GRAPH_PROV finales: "${templateData['GRAPH_PROV']}"`, 'success');
+                                            addLog(`    📊 Top 6 communes: ${top6Communes.map(c => `${c.name} (${c.percentage}%)`).join(', ')}`, 'info');
+                                            if (otherPercentage > 0) {
+                                                addLog(`    📊 Autres communes: ${otherPercentage.toFixed(1)}%`, 'info');
+                                            }
+                                        }
+                                    } else {
+                                        addLog(`    ⚠️ Aucune ligne Provenance trouvée pour la période ${currentPeriod}`, 'warning');
+                                    }
+                                }
+                            }
+                        }
+
+                        // Traiter les slides pour les remplacements de texte
+                        const slideFiles = [];
+                        zip.forEach((relativePath, file) => {
+                            if (relativePath.includes('slides/slide') && relativePath.endsWith('.xml')) {
+                                slideFiles.push(relativePath);
+                            }
+                        });
+                        
+                        addLog(`  📊 ${slideFiles.length} slides trouvées`, 'info');
+                        
+                        // DEBUG: Afficher toutes les variables disponibles
+                        addLog(`  🔍 DEBUG: Variables disponibles dans templateData:`, 'info');
+                        for (const [key, value] of Object.entries(templateData)) {
+                            addLog(`    🔍 ${key}: ${value}`, 'info');
+                        }
+                        
+                        // Nouvelle logique simplifiée pour les pages de garde
+                        const networkDataForCover = parseNetworkData(networkName);
+                        const isFlancGauche = networkDataForCover.face && networkDataForCover.face.toLowerCase().includes('gauche');
+                        
+                        addLog(`      📄 Type de flanc détecté: ${isFlancGauche ? 'Flanc Gauche' : 'Flanc Droit/Arrière'}`, 'info');
+                        
+                        // Traiter toutes les slides avec masquage au lieu de suppression
+                        for (const slideFile of slideFiles) {
+                            const content = await zip.file(slideFile).async('string');
+                            let modifiedContent = content;
+                            
+                            // Déterminer si cette slide doit être masquée
+                            let shouldHide = false;
+                            
+                            if (slideFile.includes('slide1.xml') && !isFlancGauche) {
+                                // Masquer slide 1 si flanc droit ou arrière
+                                shouldHide = true;
+                                addLog(`      👁️ Slide 1 masquée (Flanc Droit/Arrière)`, 'info');
+                            } else if (slideFile.includes('slide2.xml') && isFlancGauche) {
+                                // Masquer slide 2 si flanc gauche
+                                shouldHide = true;
+                                addLog(`      👁️ Slide 2 masquée (Flanc Gauche)`, 'info');
+                            }
+                            
+                            // Masquer la slide en supprimant tout son contenu
+                            if (shouldHide) {
+                                // Vider complètement le contenu de la slide
+                                modifiedContent = modifiedContent.replace(
+                                    /<p:sld[^>]*>.*?<\/p:sld>/gs,
+                                    '<p:sld><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld></p:sld>'
+                                );
+                                addLog(`      🔧 Contenu de la slide vidé pour masquage: ${slideFile}`, 'info');
+                            }
+                            
+                            // Traiter les variables pour toutes les slides
+                            for (const [templateKey, value] of Object.entries(templateData)) {
+                                const placeholder = `{${templateKey}}`;
+                                if (modifiedContent.includes(placeholder)) {
+                                    modifiedContent = modifiedContent.replace(new RegExp(placeholder, 'g'), value);
+                                    addLog(`      🔄 Remplacé ${placeholder} par ${value}`, 'info');
+                                } else if (templateKey === 'NB_SEMAINE') {
+                                    // Debug spécifique pour NB_SEMAINE
+                                    addLog(`      🔍 DEBUG: {NB_SEMAINE} non trouvé dans ${slideFile}`, 'warning');
+                                    addLog(`      🔍 DEBUG: Contenu slide (500 chars): ${modifiedContent.substring(0, 500)}`, 'info');
+                                }
+                            }
+                            
+                            // FORCER le remplacement de NB_SEMAINE même s'il n'est pas trouvé dans le mapping
+                            if (templateData['NB_SEMAINE']) {
+                                const nbSemaineValue = templateData['NB_SEMAINE'];
+                                const originalContent = modifiedContent;
+                                modifiedContent = modifiedContent.replace(/\{NB_SEMAINE\}/g, nbSemaineValue);
+                                if (modifiedContent !== originalContent) {
+                                    addLog(`      🔧 FORCÉ: {NB_SEMAINE} remplacé par ${nbSemaineValue}`, 'success');
+                                } else {
+                                    addLog(`      🔍 FORCÉ: {NB_SEMAINE} non trouvé dans le contenu`, 'warning');
+                                }
+                            }
+                            
+                            zip.file(slideFile, modifiedContent);
+                            addLog(`      ✅ Slide traitée: ${slideFile}`, 'success');
+                        }
+                        
+                        // Traiter les graphiques Excel embarqués
+                        const chartsProcessed = await processEmbeddedCharts(zip, templateData);
+                        addLog(`  📈 ${chartsProcessed} graphiques traités`, 'info');
+                        
+                        // Générer le fichier PowerPoint
+                        const blob = await zip.generateAsync({
+                            type: "blob",
+                            compression: "STORE", // Pas de compression pour éviter la corruption
+                            compressionOptions: { level: 0 }
+                        });
+
+                        // Validation du fichier généré
+                        if (!blob || blob.size === 0) {
+                            throw new Error(`Fichier PowerPoint vide généré pour ${networkName}`);
+                        }
+                        
+                        addLog(`  ✅ Fichier PowerPoint généré: ${(blob.size / 1024 / 1024).toFixed(2)} MB`, 'success');
+
+                        const fileName = `${outputPrefix}_${networkName}.pptx`;
+                        
+                        // Parser les données de la colonne "Réseau" pour créer la hiérarchie
+                        const networkData = parseNetworkData(networkName);
+                        addLog(`  📊 Données réseau parsées: ${JSON.stringify(networkData)}`, 'info');
+                        
+                        // Créer le chemin de fichier avec la hiérarchie
+                        const filePath = createFileHierarchy(networkData, fileName);
+                        
+                        // Collecter le fichier pour le ZIP avec la hiérarchie
+                        allFiles.push({
+                            name: filePath,
+                            blob: blob,
+                            type: 'pptx',
+                            networkData: networkData
+                        });
+                        
+                        // Créer le fichier template email avec extension .doc pour éviter le blocage Windows
+                        const emailTemplate = createEmailTemplate(row, networkName);
+                        const docFileName = `Template email - ${fileName.replace('.pptx', '.doc')}`;
+                        const docFilePath = createFileHierarchy(networkData, docFileName);
+                        const docBlob = new Blob([emailTemplate], { type: 'application/msword;charset=utf-8' });
+                        
+                        // Collecter le fichier email pour le ZIP final avec la hiérarchie
+                        allFiles.push({
+                            name: docFilePath,
+                            blob: docBlob,
+                            type: 'doc',
+                            networkData: networkData
+                        });
+                        
+                        addLog(`  📧 Template email généré: ${docFileName}`, 'info');
+                        
+                        results.push({
+                            fileName: fileName,
+                            network: networkName,
+                            replacements: replacementsCount,
+                            charts: chartsProcessed,
+                            row: i + 1
+                        });
+
+                        addLog(`  ✅ Fichier créé: ${fileName}`, 'success');
+                        addLog(`  ✅ Template email créé: ${docFileName}`, 'success');
+                        updatePptProgress(i + 1, maxRows);
+                        
+                    } catch (error) {
+                        addLog(`  ❌ Erreur ligne ${i + 1}: ${error.message}`, 'error');
+                        updatePptProgress(i + 1, maxRows);
+                    }
+                }
+                
+                updatePptProgress(maxRows, maxRows);
+
+                // Créer le ZIP final avec tous les fichiers
+                if (allFiles.length > 0) {
+                    addLog(`📦 Création du dossier ZIP avec ${allFiles.length} fichiers...`, 'info');
+                    
+                    try {
+                        // Créer un nouveau ZIP pour contenir tous les fichiers
+                        const finalZip = new JSZip();
+                        
+                        // Ajouter tous les fichiers au ZIP
+                        for (const file of allFiles) {
+                            finalZip.file(file.name, file.blob);
+                        }
+                        
+                        // Générer le ZIP final
+                        const finalZipBlob = await finalZip.generateAsync({
+                            type: "blob",
+                            compression: "STORE", // Pas de compression pour éviter la corruption
+                            compressionOptions: { level: 0 }
+                        });
+                        
+                        // Validation du ZIP final
+                        if (!finalZipBlob || finalZipBlob.size === 0) {
+                            throw new Error('ZIP final vide généré');
+                        }
+                        
+                        addLog(`✅ ZIP final généré: ${(finalZipBlob.size / 1024 / 1024).toFixed(2)} MB`, 'success');
+                        
+                        // Envoyer le ZIP vers le webhook Taskalys avec le bon nom
+                        const currentYear = new Date().getFullYear();
+                        const zipFileName = `${currentYear} - rapports d'audience.zip`;
+                        addLog(`📦 Envoi du dossier ZIP vers Taskalys: ${zipFileName}`, 'success');
+                        
+                        try {
+                            // Créer FormData pour l'envoi
+                            const formData = new FormData();
+                            formData.append('file', finalZipBlob, zipFileName);
+                            formData.append('timestamp', new Date().toISOString());
+                            formData.append('totalFiles', allFiles.length.toString());
+                            formData.append('email', emailDestination);
+                            addLog(`📧 Email de destination inclus: ${emailDestination}`, 'info');
+                            
+                            // Envoyer vers le webhook
+                            const response = await fetch('https://host.taskalys.app/webhook/buster', {
+                                method: 'POST',
+                                body: formData
+                            });
+                            
+                            if (response.ok) {
+                                const result = await response.text();
+                                addLog(`✅ ZIP envoyé avec succès vers Taskalys`, 'success');
+                                addLog(`📋 Réponse du serveur: ${result}`, 'info');
+                            } else {
+                                addLog(`❌ Erreur envoi ZIP: ${response.status} ${response.statusText}`, 'error');
+                            }
+                            
+                        } catch (error) {
+                            addLog(`❌ Erreur envoi vers Taskalys: ${error.message}`, 'error');
+                            
+                            // Solution de secours : téléchargement local pour test
+                            addLog(`🔄 Téléchargement local comme solution de secours...`, 'warning');
+                            
+                            try {
+                                const downloadLink = document.createElement('a');
+                                downloadLink.href = URL.createObjectURL(finalZipBlob);
+                                downloadLink.download = zipFileName;
+                                downloadLink.click();
+                                addLog(`✅ Fichier ZIP téléchargé localement: ${zipFileName}`, 'success');
+                                addLog(`💡 Vous pouvez maintenant tester l'ouverture des fichiers PowerPoint`, 'info');
+                            } catch (downloadError) {
+                                addLog(`❌ Erreur téléchargement local: ${downloadError.message}`, 'error');
+                                throw new Error(`Échec complet: API + Téléchargement local`);
+                            }
+                        }
+                        
+                        addLog(`✅ ${allFiles.length} fichiers envoyés dans le dossier ZIP vers Taskalys`, 'success');
+                        
+                        // Afficher des informations sur l'envoi vers Taskalys
+                        addLog(`📡 Les fichiers ont été envoyés vers le serveur Taskalys`, 'info');
+                        addLog(`📧 Consultez vos emails pour recevoir les rapports d'audience`, 'success');
+                        addLog(`🔗 Webhook: https://host.taskalys.app/webhook-test/buster`, 'info');
+                        
+                        // Arrêter l'estimation du temps
+                        stopTimeEstimation();
+                        
+                    } catch (error) {
+                        addLog(`❌ Erreur création ZIP: ${error.message}`, 'error');
+                    }
+                }
+
+                setTimeout(() => {
+                    hidePptLoadingScreen();
+                }, 2000);
+
+                return {
+                    success: true,
+                    processed: results.length,
+                    results: results,
+                    totalRows: jsonData.length,
+                    totalFiles: allFiles.length
+                };
+
+            } catch (error) {
+                addLog(`❌ Erreur lors du traitement: ${error.message}`, 'error');
+                stopTimeEstimation(); // Arrêter l'estimation du temps en cas d'erreur
+                hidePptLoadingScreen();
+                return {
+                    success: false,
+                    error: error.message
+                };
+            }
+        }
+
+        // Fonction pour lire un fichier Excel
+        function readExcelFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        resolve(workbook);
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.onerror = () => reject(new Error('Erreur lors de la lecture du fichier Excel'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // Variables pour l'estimation du temps
+        let processingStartTime = null;
+        let totalRowsToProcess = 0;
+        let currentRow = 0;
+        let estimatedTimePerFile = 15000; // 15 secondes par fichier en moyenne
+        let timeEstimationInterval = null;
+
+        // Fonctions pour l'estimation du temps
+        function initializeTimeEstimation(totalRows) {
+            totalRowsToProcess = totalRows;
+            processingStartTime = Date.now();
+            
+            // Mettre à jour l'affichage initial
+            updateTimeEstimation(0);
+            
+            // Démarrer l'intervalle de mise à jour
+            timeEstimationInterval = setInterval(() => {
+                updateTimeEstimation(currentRow);
+            }, 1000);
+        }
+
+        function updateTimeEstimation(processedRows) {
+            const timeRemainingValue = document.getElementById('timeRemainingValue');
+            const processedCount = document.getElementById('processedCount');
+            const totalCount = document.getElementById('totalCount');
+            
+            if (timeRemainingValue && processedCount && totalCount) {
+                processedCount.textContent = processedRows;
+                totalCount.textContent = totalRowsToProcess;
+                
+                if (processedRows === 0) {
+                    timeRemainingValue.textContent = 'Calcul en cours...';
+                } else {
+                    const elapsed = Date.now() - processingStartTime;
+                    const avgTimePerFile = elapsed / processedRows;
+                    const remainingFiles = totalRowsToProcess - processedRows;
+                    const estimatedRemainingMs = remainingFiles * avgTimePerFile;
+                    
+                    timeRemainingValue.textContent = formatTime(estimatedRemainingMs);
+                }
+            }
+        }
+
+        function formatTime(milliseconds) {
+            const seconds = Math.round(milliseconds / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            
+            if (minutes > 0) {
+                return `${minutes}m ${remainingSeconds}s`;
+            } else {
+                return `${remainingSeconds}s`;
+            }
+        }
+
+        function stopTimeEstimation() {
+            if (timeEstimationInterval) {
+                clearInterval(timeEstimationInterval);
+                timeEstimationInterval = null;
+            }
+        }
+
+        // Fonction pour ajouter des logs
+        function addLog(message, type = 'info') {
+            const logsContent = document.getElementById('logsContent');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            
+            const time = new Date().toLocaleTimeString();
+            logEntry.innerHTML = `
+                <span class="log-time">[${time}]</span>
+                <span class="log-message">${message}</span>
+            `;
+            
+            logsContent.appendChild(logEntry);
+            logsContent.scrollTop = logsContent.scrollHeight;
+        }
+
+
+
+
+        // Gestion de la soumission du formulaire
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const excelFile = document.getElementById('excelFile').files[0];
+            const powerpointFile = document.getElementById('powerpointFile').files[0];
+            const emailDestination = document.getElementById('emailInput').value;
+            const outputPrefix = 'rapport_audience';
+
+            addLog(`Validation: Excel=${excelFile ? 'OK' : 'MANQUANT'}, PowerPoint=${powerpointFile ? 'OK' : 'MANQUANT'}, Email=${emailDestination ? 'OK' : 'MANQUANT'}`, 'info');
+            
+            if (!excelFile) {
+                addLog('Veuillez sélectionner un fichier Excel', 'error');
+                return;
+            }
+            
+            if (!powerpointFile) {
+                addLog('Veuillez sélectionner un fichier PowerPoint', 'error');
+                return;
+            }
+
+            if (!emailDestination) {
+                addLog('Veuillez saisir l\'email de destination', 'error');
+                return;
+            }
+
+
+            document.getElementById('formContainer').classList.add('hidden');
+            document.getElementById('loadingScreen').classList.add('active');
+
+            const dots = document.querySelector('.dots');
+            let dotCount = 0;
+            const dotInterval = setInterval(() => {
+                dotCount = (dotCount + 1) % 4;
+                dots.textContent = '.'.repeat(dotCount);
+            }, 500);
+
+            try {
+                addLog('Démarrage du traitement local...', 'info');
+                const result = await processFilesLocally(excelFile, powerpointFile, outputPrefix, emailDestination);
+                
+                clearInterval(dotInterval);
+                
+                if (result.success) {
+                    addLog('Traitement réussi!', 'success');
+                    showLocalProcessingResult(result);
+                } else {
+                    addLog(`Échec du traitement: ${result.error}`, 'error');
+                    showErrorResult(result.error);
+                }
+            } catch (error) {
+                clearInterval(dotInterval);
+                stopTimeEstimation(); // Arrêter l'estimation du temps en cas d'erreur
+                addLog(`Erreur: ${error.message}`, 'error');
+                showErrorResult(error.message);
+            }
+            
+            document.getElementById('uploadForm').reset();
+            document.getElementById('excelLabel').querySelector('span').textContent = 'Sélectionner un fichier Excel (.xlsx, .xls)';
+            document.getElementById('excelLabel').classList.remove('has-file');
+            document.getElementById('powerpointLabel').querySelector('span').textContent = 'Sélectionner un fichier PowerPoint (.pptx, .ppt)';
+            document.getElementById('powerpointLabel').classList.remove('has-file');
+            
+            document.getElementById('formContainer').classList.remove('hidden');
+            document.getElementById('loadingScreen').classList.remove('active');
+        });
+
+        // Fonction pour afficher la documentation (simplifiée)
+        function showDocumentation() {
+            const doc = `
+📋 DOCUMENTATION - GÉNÉRATEUR DE RAPPORTS D'AUDIENCE
+
+🎯 FONCTIONNALITÉS :
+• Génération automatique de rapports PowerPoint
+• Traitement des données Excel (Performance média, Audience, Provenance)
+• Gestion des pages de garde selon le type de flanc
+• Envoi automatique par email via API Taskalys
+
+📁 FICHIERS REQUIS :
+• Fichier Excel avec feuilles : "Performance média", "Audience", "Provenance"
+• Template PowerPoint avec variables {VILLE}, {PERIODE}, {AUDIENCE}, etc.
+
+🔧 VARIABLES DISPONIBLES :
+• {VILLE} - Nom de la ville (majuscules)
+• {PERIODE} - Période formatée (ex: "du 1 janvier 2024 au 7 janvier 2024")
+• {AUDIENCE} - Audience cible formatée
+• {ODV} - Nombre d'ODV formaté
+• {NB_SEMAINE} - Numéro de semaine (1-52)
+
+📧 EMAIL :
+• Template personnalisable avec variables
+• Envoi automatique via API Taskalys
+• Fichiers organisés par hiérarchie (Semaine/Ville/Face/Version)
+
+⚡ TRAITEMENT :
+• Limité à 3 lignes en mode debug
+• Estimation du temps en temps réel
+• Masquage des slides selon le type de flanc
+• Génération de ZIP avec hiérarchie de dossiers
+            `;
+            
+            alert(doc);
+            return;
+            
+            const popup = document.createElement('div');
+            popup.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                font-family: 'Poppins', sans-serif;
+            `;
+            
+            const popupContent = document.createElement('div');
+            popupContent.style.cssText = `
+                background: #2c2c83;
+                border-radius: 20px;
+                padding: 30px;
+                max-width: 900px;
+                max-height: 80vh;
+                overflow-y: auto;
+                color: white;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            `;
+            
+            const header = document.createElement('h2');
+            header.innerHTML = 'Documentation - Configuration des fichiers avec graphiques';
+            header.style.cssText = `
+                margin-bottom: 20px;
+                font-size: 1.5rem;
+                font-weight: 700;
+                color: #4CAF50;
+            `;
+            
+            const content = `
+                <div style="margin-bottom: 25px;">
+                    <h3 style="color: #a2137b; margin-bottom: 15px; font-size: 1.2rem;">1. Configuration du fichier Excel</h3>
+                    <h4 style="color: #4CAF50; margin: 15px 0 10px 0;">Feuille "Performance média" :</h4>
+                    <ul style="margin: 0 0 15px 20px; line-height: 1.6;">
+                        <li><strong>Ville</strong> - Nom de la ville</li>
+                        <li><strong>Réseau</strong> - Nom du réseau (pour le nom du fichier)</li>
+                        <li><strong>Période</strong> - Format: "du 2024-09-19 au 2024-10-02"</li>
+                        <li><strong>ODV Cible, ODV Total, GRP, Audience Cible</strong> - Nombres entiers</li>
+                        <li><strong>Répétition Cible</strong> - Nombre décimal</li>
+                        <li><strong>Couverture Cible</strong> - Entre 0 et 1 (converti en %)</li>
+                    </ul>
+                    <h4 style="color: #4CAF50; margin: 15px 0 10px 0;">Feuille "Audience" :</h4>
+                    <ul style="margin: 0 0 15px 20px; line-height: 1.6;">
+                        <li><strong>Colonnes C-G</strong> - Données d'âge (15-24, 25-34, 35-49, 50-64, 65+)</li>
+                        <li><strong>Colonnes H-P</strong> - Données CSP (Agriculteurs, Artisans, etc.)</li>
+                        <li><strong>Colonnes Q-R</strong> - Données Homme/Femme</li>
+                    </ul>
+                </div>
+
+                <div style="margin-bottom: 25px;">
+                    <h3 style="color: #a2137b; margin-bottom: 15px; font-size: 1.2rem;">2. Configuration du template PowerPoint</h3>
+                    <h4 style="color: #4CAF50; margin: 15px 0 10px 0;">Placeholders texte :</h4>
+                    <ul style="margin: 0 0 15px 20px; line-height: 1.6;">
+                        <li><strong>{CITY}</strong> - Ville en majuscules
+                        <li><strong>{DATE}</strong> - Période formatée
+                        <li><strong>{VIEWS}, {ODV}, {GRP}, {AUDIENCE}</strong> - Nombres arrondis
+                        <li><strong>{TIMES}</strong> - Répétition avec 1 décimale
+                        <li><strong>{POP}</strong> - Couverture en pourcentage
+                        <li><strong>{MEN}, {WOMEN}</strong> - Répartition Homme/Femme
+                    </ul>
+                    <h4 style="color: #FF5722; margin: 15px 0 10px 0;">Graphiques intégrés :</h4>
+                    <p style="margin-bottom: 10px;">Dans vos graphiques Excel embarqués, utilisez ces noms spéciaux :</p>
+                    <ul style="margin: 0 0 15px 20px; line-height: 1.6;">
+                        <li><strong>{AGE}</strong> - Remplacé par les données d'âge de la feuille Audience</li>
+                        <li><strong>{SOCIO-PRO}</strong> - Remplacé par les données CSP</li>
+                        <li><strong>{PROVENANCE}</strong> - Remplacé par les données Homme/Femme</li>
+                    </ul>
+                    <p style="color: rgba(255, 255, 255, 0.8); font-size: 0.9rem;">
+                        Ces noms doivent apparaître exactement dans une cellule du fichier Excel embarqué du graphique.
+                        Le système détectera automatiquement la structure (verticale ou horizontale) et adaptera les données.
+                    </p>
+                </div>
+
+                <div style="margin-bottom: 25px;">
+                    <h3 style="color: #a2137b; margin-bottom: 15px; font-size: 1.2rem;">3. Structure des graphiques supportées</h3>
+                    <h4 style="color: #4CAF50; margin: 15px 0 10px 0;">Structure Verticale (comme Image 1) :</h4>
+                    <ul style="margin: 0 0 15px 20px; line-height: 1.6;">
+                        <li>Colonne A : Labels (15-24 ans, 25-34 ans, etc.)</li>
+                        <li>Colonne B : Valeurs décimales (0.241, 0.173, etc.)</li>
+                        <li>Détectée automatiquement si "Audience" trouvé près du nom</li>
+                    </ul>
+                    <h4 style="color: #4CAF50; margin: 15px 0 10px 0;">Structure Horizontale (comme Image 2) :</h4>
+                    <ul style="margin: 0 0 15px 20px; line-height: 1.6;">
+                        <li>Ligne 1 : Headers (Cadres, Employés, Ouvriers, etc.)</li>
+                        <li>Ligne 2 : Valeurs décimales (0.087, 0.153, etc.)</li>
+                        <li>Structure par défaut pour les graphiques CSP</li>
+                    </ul>
+                </div>
+
+                <div style="margin-bottom: 25px;">
+                    <h3 style="color: #a2137b; margin-bottom: 15px; font-size: 1.2rem;">4. Processus de traitement</h3>
+                    <ol style="margin: 0 0 15px 20px; line-height: 1.6;">
+                        <li>Le système lit les données Excel (Performance + Audience)</li>
+                        <li>Pour chaque ligne, il crée un fichier PowerPoint personnalisé</li>
+                        <li>Les placeholders texte sont remplacés dans les slides</li>
+                        <li>Les graphiques Excel embarqués sont modifiés avec les données réelles</li>
+                        <li>Le fichier est téléchargé avec le nom : préfixe_réseau.pptx</li>
+                    </ol>
+                </div>
+
+                <div style="margin-bottom: 20px; padding: 15px; background: rgba(255, 193, 7, 0.1); border-radius: 10px; border-left: 4px solid #FFC107;">
+                    <h4 style="color: #FFC107; margin-bottom: 10px;">Points importants</h4>
+                    <p style="margin: 0; font-size: 0.9rem;">
+                        - Les noms {AGE}, {SOCIO-PRO}, {PROVENANCE} doivent être exactement dans une cellule Excel du graphique<br>
+                        - La détection de structure est automatique mais peut être forcée<br>
+                        - Maximum 10 fichiers PowerPoint générés par traitement<br>
+                        - Les données démographiques viennent de la feuille "Audience" basée sur la période
+                    </p>
+                </div>
+            `;
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = 'Fermer';
+            closeBtn.style.cssText = `
+                background: #a2137b;
+                color: white;
+                border: none;
+                border-radius: 10px;
+                padding: 12px 24px;
+                font-size: 1rem;
+                font-weight: 600;
+                cursor: pointer;
+                margin-top: 20px;
+                width: 100%;
+                transition: all 0.3s ease;
+            `;
+            
+            closeBtn.onmouseover = () => closeBtn.style.background = '#8a0f66';
+            closeBtn.onmouseout = () => closeBtn.style.background = '#a2137b';
+            closeBtn.onclick = () => document.body.removeChild(popup);
+            
+            popupContent.appendChild(header);
+            popupContent.innerHTML += content;
+            popupContent.appendChild(closeBtn);
+            popup.appendChild(popupContent);
+            
+            popup.onclick = (e) => {
+                if (e.target === popup) {
+                    document.body.removeChild(popup);
+                }
+            };
+            
+            document.body.appendChild(popup);
+        }
+
+        // Fonction pour afficher les résultats du traitement local
+        function showLocalProcessingResult(result) {
+            alert(`✅ Traitement terminé !\n\n${result.processed} fichiers générés et envoyés par email.\n\nConsultez vos emails pour recevoir les rapports.`);
+            return;
+            
+            const popup = document.createElement('div');
+            popup.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                font-family: 'Poppins', sans-serif;
+            `;
+            
+            const popupContent = document.createElement('div');
+            popupContent.style.cssText = `
+                background: #2c2c83;
+                border-radius: 20px;
+                padding: 30px;
+                max-width: 800px;
+                max-height: 80vh;
+                overflow-y: auto;
+                color: white;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            `;
+            
+            const header = document.createElement('h2');
+            header.innerHTML = '✅ Traitement terminé avec succès !';
+            header.style.cssText = `
+                margin-bottom: 20px;
+                font-size: 1.5rem;
+                font-weight: 700;
+                color: #4CAF50;
+            `;
+            
+            let content = `
+                <div style="margin-bottom: 20px;">
+                    <p><strong>Fichiers PowerPoint générés:</strong> ${result.processed}</p>
+                    <p><strong>Total fichiers dans le ZIP:</strong> ${result.totalFiles || result.processed * 2}</p>
+                    <p><strong>Total lignes disponibles:</strong> ${result.totalRows}</p>
+                    <p><strong>Timestamp:</strong> ${new Date().toLocaleString()}</p>
+                </div>
+            `;
+            
+            if (result.results && result.results.length > 0) {
+                content += '<div style="margin-bottom: 20px;"><strong>📋 Détail des fichiers générés:</strong></div>';
+                result.results.forEach(file => {
+                    content += `
+                        <div style="margin-bottom: 10px; padding: 10px; background: rgba(255, 255, 255, 0.1); border-radius: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>${file.fileName}</strong><br>
+                                    <span style="color: rgba(255, 255, 255, 0.7);">Réseau: ${file.network} | Ligne: ${file.row}</span>
+                                </div>
+                                <div style="color: #4CAF50; font-weight: 600; text-align: right;">
+                                    ${file.replacements} remplacements<br>
+                                    <span style="font-size: 0.8rem;">${file.charts || 0} graphiques</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            content += `
+                <div style="margin-top: 20px; padding: 15px; background: rgba(34, 139, 34, 0.1); border-radius: 10px; border-left: 4px solid #22B022;">
+                    <h3 style="color: #22B022; margin-bottom: 10px;">📊 Fonctionnalités utilisées</h3>
+                    <ul style="margin: 0; padding-left: 20px; font-size: 0.9rem;">
+                        <li>Remplacement automatique des placeholders texte</li>
+                        <li>Modification des graphiques Excel embarqués</li>
+                        <li>Détection automatique de la structure des graphiques</li>
+                        <li>Intégration des données démographiques de la feuille Audience</li>
+                        <li>Formatage intelligent des nombres et dates</li>
+                    </ul>
+                </div>
+            `;
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = 'Fermer';
+            closeBtn.style.cssText = `
+                background: #a2137b;
+                color: white;
+                border: none;
+                border-radius: 10px;
+                padding: 12px 24px;
+                font-size: 1rem;
+                font-weight: 600;
+                cursor: pointer;
+                margin-top: 20px;
+                width: 100%;
+                transition: all 0.3s ease;
+            `;
+            
+            closeBtn.onmouseover = () => closeBtn.style.background = '#8a0f66';
+            closeBtn.onmouseout = () => closeBtn.style.background = '#a2137b';
+            closeBtn.onclick = () => document.body.removeChild(popup);
+            
+            popupContent.appendChild(header);
+            popupContent.innerHTML += content;
+            popupContent.appendChild(closeBtn);
+            popup.appendChild(popupContent);
+            
+            popup.onclick = (e) => {
+                if (e.target === popup) {
+                    document.body.removeChild(popup);
+                }
+            };
+            
+            document.body.appendChild(popup);
+        }
+
+        function showErrorResult(message, details = null) {
+            alert(`❌ Erreur lors du traitement :\n\n${message}\n\nVeuillez réessayer.`);
+            return;
+            
+            const popup = document.createElement('div');
+            popup.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                font-family: 'Poppins', sans-serif;
+            `;
+            
+            const popupContent = document.createElement('div');
+            popupContent.style.cssText = `
+                background: #2c2c83;
+                border-radius: 20px;
+                padding: 30px;
+                max-width: 600px;
+                max-height: 80vh;
+                overflow-y: auto;
+                color: white;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            `;
+            
+            const header = document.createElement('h2');
+            header.innerHTML = '❌ Erreur de traitement';
+            header.style.cssText = `
+                margin-bottom: 20px;
+                font-size: 1.5rem;
+                font-weight: 700;
+                color: #FF5722;
+            `;
+            
+            let detailsHtml = '';
+            if (details) {
+                detailsHtml = `
+                    <details style="margin-top: 15px;">
+                        <summary style="cursor: pointer; color: rgba(255, 255, 255, 0.8);">Détails de l'erreur</summary>
+                        <pre style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 10px; margin-top: 10px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;">${JSON.stringify(details, null, 2)}</pre>
+                    </details>
+                `;
+            }
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = 'Fermer';
+            closeBtn.style.cssText = `
+                background: #a2137b;
+                color: white;
+                border: none;
+                border-radius: 10px;
+                padding: 12px 24px;
+                font-size: 1rem;
+                font-weight: 600;
+                cursor: pointer;
+                margin-top: 20px;
+                width: 100%;
+                transition: all 0.3s ease;
+            `;
+            
+            closeBtn.onmouseover = () => closeBtn.style.background = '#8a0f66';
+            closeBtn.onmouseout = () => closeBtn.style.background = '#a2137b';
+            closeBtn.onclick = () => document.body.removeChild(popup);
+            
+            popupContent.appendChild(header);
+            popupContent.innerHTML += `<p>${message}</p>${detailsHtml}`;
+            popupContent.appendChild(closeBtn);
+            popup.appendChild(popupContent);
+            
+            popup.onclick = (e) => {
+                if (e.target === popup) {
+                    document.body.removeChild(popup);
+                }
+            };
+            
+            document.body.appendChild(popup);
+        }
+
+        // Gestion de l'interface de logs
+        document.getElementById('clearLogsBtn').addEventListener('click', function() {
+            const logsContent = document.getElementById('logsContent');
+            logsContent.innerHTML = `
+                <div class="log-entry info">
+                    <span class="log-time">[${new Date().toLocaleTimeString()}]</span>
+                    <span class="log-message">Logs effacés - Interface prête</span>
+                </div>
+            `;
+        });
+
+        // Toggle pour réduire/agrandir les logs
+        document.querySelector('.logs-header').addEventListener('click', function() {
+            const logsContainer = document.getElementById('logsContainer');
+            logsContainer.classList.toggle('collapsed');
+        });
+
+        // Animation des points de chargement
+        const dots = document.querySelector('.dots');
+        let dotCount = 0;
+        setInterval(() => {
+            if (document.getElementById('loadingScreen').classList.contains('active')) {
+                dotCount = (dotCount + 1) % 4;
+                dots.textContent = '.'.repeat(dotCount);
+            }
+        }, 500);
+    </script>
+</body>
+</html>
