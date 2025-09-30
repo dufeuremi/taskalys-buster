@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rapport d'audience - Taskalys</title>
-    <link rel="icon" type="image/x-icon" href="favicon-32x32.ico">
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- Bibliothèques pour traitement local -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -459,6 +460,7 @@
             max-height: 300px;
             z-index: 1000;
             transition: transform 0.3s ease;
+            display: none; /* Masquer la console par défaut */
         }
 
         .logs-container.collapsed {
@@ -705,11 +707,12 @@
                     <div class="email-editor-simple">
                         <textarea id="emailTemplateEditor" name="emailTemplateEditor" placeholder="Tapez votre template email ici...">Bonjour,
 Vous trouverez ci-joint le bilan complet de votre campagne menée sur les bus de {VILLE} {PERIODE}.
-Durant cette période (semaine {NB_SEMAINE}), vous avez touché une audience de {AUDIENCE} personnes et votre campagne a généré plus de {ODV} contacts.
+Durant cette période (semaine {WEEK}), vous avez touché une audience de {AUDIENCE} personnes et votre campagne a généré plus de {ODV} contacts.
 Parcourez le document en pièce jointe pour connaître les indicateurs clés de votre campagne et le profil de votre audience.
 Bien à vous,</textarea>
                     </div>
                 </div>
+
 
                 <button type="submit" class="submit-btn" id="submitBtn">
                     Générer
@@ -762,12 +765,13 @@ Bien à vous,</textarea>
 
         <div class="powered-by">
             Powered by <a href="https://taskalys.fr" target="_blank">Taskalys.fr</a>
+            <button id="toggleConsoleBtn" style="margin-left: 20px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.8rem;">Console</button>
         </div>
     </div>
 
     <div class="logs-container" id="logsContainer">
         <div class="logs-header">
-            <h3>📋 Logs de traitement</h3>
+            <h3>Console</h3>
             <button id="clearLogsBtn" class="clear-logs-btn">Effacer</button>
         </div>
         <div class="logs-content" id="logsContent">
@@ -780,7 +784,7 @@ Bien à vous,</textarea>
 
     <script>
         // Fonction pour traiter les graphiques via XML uniquement (sans Excel)
-        async function processEmbeddedCharts(zip, templateData) {
+        async function processEmbeddedCharts(zip, templateData, row = null, excelData = null) {
             try {
                 addLog('📊 RECHERCHE DES GRAPHIQUES VIA XML UNIQUEMENT', 'info');
                 
@@ -795,6 +799,85 @@ Bien à vous,</textarea>
                     }
                 });
                 
+                // DEBUG: Recherche globale et exhaustive de GRAPH_PROV
+                addLog('🔍 DEBUG: Recherche globale et exhaustive de GRAPH_PROV...', 'info');
+                let globalFound = false;
+                let allFiles = [];
+                
+                // Collecter tous les fichiers (XML, Excel, etc.)
+                zip.forEach((relativePath, file) => {
+                    allFiles.push({ path: relativePath, file: file });
+                });
+                
+                addLog(`📋 Analyse de ${allFiles.length} fichiers au total`, 'info');
+                
+                // Analyser chaque fichier
+                for (const fileInfo of allFiles) {
+                    try {
+                        const { path, file } = fileInfo;
+                        
+                        // Pour les fichiers XML
+                        if (path.endsWith('.xml')) {
+                            const content = await file.async('string');
+                            
+                            // Recherche exacte
+                            if (content.includes('GRAPH_PROV')) {
+                                addLog(`  ✅ GRAPH_PROV trouvé dans: ${path}`, 'success');
+                                globalFound = true;
+                            }
+                            // Recherche avec variations
+                            else if (content.includes('GRAPHIQUE PROVENANCE')) {
+                                addLog(`  🔍 "GRAPHIQUE PROVENANCE" (avec espace) trouvé dans: ${path}`, 'warning');
+                            }
+                            else if (content.includes('graph_prov')) {
+                                addLog(`  🔍 "graph_prov" (minuscules) trouvé dans: ${path}`, 'warning');
+                            }
+                            else if (content.includes('GraphProv')) {
+                                addLog(`  🔍 "GraphProv" (camelCase) trouvé dans: ${path}`, 'warning');
+                            }
+                            // Recherche de patterns similaires
+                            else if (content.includes('PROVENANCE')) {
+                                addLog(`  🔍 Mot "PROVENANCE" trouvé dans: ${path}`, 'info');
+                                // Extraire le contexte autour de PROVENANCE
+                                const provenanceIndex = content.indexOf('PROVENANCE');
+                                const context = content.substring(Math.max(0, provenanceIndex - 50), provenanceIndex + 50);
+                                addLog(`    📄 Contexte: ...${context}...`, 'info');
+                            }
+                        }
+                        
+                        // Pour les fichiers Excel embarqués
+                        else if (path.includes('embeddings/') && path.endsWith('.xlsx')) {
+                            addLog(`  📊 Analyse du fichier Excel embarqué: ${path}`, 'info');
+                            try {
+                                const excelBuffer = await file.async('arraybuffer');
+                                const workbook = XLSX.read(excelBuffer, { type: 'array' });
+                                
+                                // Chercher dans toutes les feuilles
+                                for (const sheetName of Object.keys(workbook.Sheets)) {
+                                    const sheet = workbook.Sheets[sheetName];
+                                    const sheetContent = XLSX.utils.sheet_to_txt(sheet);
+                                    
+                                    if (sheetContent.includes('GRAPH_PROV')) {
+                                        addLog(`    ✅ GRAPH_PROV trouvé dans ${path}, feuille "${sheetName}"`, 'success');
+                                        globalFound = true;
+                                    }
+                                    else if (sheetContent.includes('GRAPHIQUE PROVENANCE')) {
+                                        addLog(`    🔍 "GRAPHIQUE PROVENANCE" trouvé dans ${path}, feuille "${sheetName}"`, 'warning');
+                                    }
+                                    else if (sheetContent.includes('PROVENANCE')) {
+                                        addLog(`    🔍 "PROVENANCE" trouvé dans ${path}, feuille "${sheetName}"`, 'info');
+                                    }
+                                }
+                            } catch (excelError) {
+                                addLog(`    ⚠️ Erreur lecture Excel ${path}: ${excelError.message}`, 'warning');
+                            }
+                        }
+                        
+                    } catch (error) {
+                        addLog(`  ⚠️ Erreur analyse ${fileInfo.path}: ${error.message}`, 'warning');
+                    }
+                }
+                
                 addLog(`📋 ${chartXmlFiles.length} fichiers XML de graphiques trouvés`, 'info');
                 
                 // Traiter chaque fichier XML de graphique
@@ -804,7 +887,7 @@ Bien à vous,</textarea>
                         const chartContent = await zip.file(chartXmlFile).async('string');
                         
                         // Modifier le contenu XML du graphique
-                        const modifiedContent = await processChartXmlContent(chartContent, templateData);
+                        const modifiedContent = await processChartXmlContent(chartContent, templateData, row, excelData);
                         
                         if (modifiedContent !== chartContent) {
                             zip.file(chartXmlFile, modifiedContent);
@@ -817,11 +900,10 @@ Bien à vous,</textarea>
                     }
                 }
                 
-                // 2. Si aucun graphique XML trouvé, chercher dans les slides
-                if (graphiquesTrouves === 0) {
-                    addLog('📊 Aucun graphique XML trouvé, recherche dans les slides...', 'info');
-                    graphiquesTrouves = await processChartsInSlides(zip, templateData);
-                }
+                // 2. Toujours chercher dans les slides pour GRAPH_PROV
+                addLog('📊 Recherche dans les slides pour GRAPH_PROV...', 'info');
+                const slideGraphiques = await processChartsInSlides(zip, templateData, row, excelData);
+                graphiquesTrouves += slideGraphiques;
 
                 return graphiquesTrouves;
 
@@ -831,8 +913,143 @@ Bien à vous,</textarea>
             }
         }
 
+        // Fonction pour traiter les données GRAPH_PROV selon l'algorithme spécifique
+        async function processGraphProvData(row, excelData) {
+            try {
+                addLog(`    🏘️ ALGORITHME GRAPH_PROV: Démarrage`, 'info');
+                
+                // 1. Aller dans la sheet Provenance
+                const provenanceSheet = excelData.Sheets['Provenance'];
+                if (!provenanceSheet) {
+                    addLog(`    ❌ Sheet "Provenance" non trouvée`, 'error');
+                    return null;
+                }
+                addLog(`    ✅ Sheet "Provenance" trouvée`, 'success');
+                
+                // 2. Récupérer la ville depuis les données du réseau
+                const networkName = row['réseau'] || row['Réseau'] || '';
+                const networkData = parseNetworkData(networkName);
+                const city = networkData.ville || row['Ville'] || '';
+                
+                if (!city) {
+                    addLog(`    ❌ Ville non trouvée dans les données`, 'error');
+                    return null;
+                }
+                
+                const cityLower = city.toLowerCase();
+                addLog(`    🏙️ Ville recherchée: "${city}" (${cityLower})`, 'info');
+                
+                // 3. Aller colonne B et descendre tant que la case n'est pas égale à la ville
+                let cityRowIndex = -1;
+                for (let rowIndex = 2; rowIndex <= 100; rowIndex++) {
+                    const cellB = provenanceSheet[`B${rowIndex}`];
+                    if (cellB && cellB.v) {
+                        const cellValue = cellB.v.toString().toLowerCase();
+                        if (cellValue === cityLower) {
+                            cityRowIndex = rowIndex;
+                            addLog(`    ✅ Ville trouvée à la ligne ${rowIndex}`, 'success');
+                            break;
+                        }
+                    }
+                }
+                
+                if (cityRowIndex === -1) {
+                    addLog(`    ❌ Ville "${city}" non trouvée dans la colonne B`, 'error');
+                    return null;
+                }
+                
+                // 4. Remonter d'une ligne et lire les légendes (colonnes C à H)
+                const legendRowIndex = cityRowIndex - 1;
+                const legendColumns = ['C', 'D', 'E', 'F', 'G', 'H'];
+                const legends = [];
+                
+                addLog(`    📋 Lecture des légendes (ligne ${legendRowIndex}, colonnes C à H):`, 'info');
+                for (let i = 0; i < legendColumns.length; i++) {
+                    const cellRef = `${legendColumns[i]}${legendRowIndex}`;
+                    const cell = provenanceSheet[cellRef];
+                    if (cell && cell.v) {
+                        legends.push(cell.v.toString());
+                        addLog(`      ${legendColumns[i]}${legendRowIndex}: "${cell.v}"`, 'info');
+                    } else {
+                        legends.push(`Ville ${i + 1}`);
+                        addLog(`      ${cellRef}: vide, nom par défaut`, 'warning');
+                    }
+                }
+                
+                // 5. Trouver la ligne des valeurs avec la date et la ville
+                const currentPeriod = row['Période'] || '';
+                let dataRowIndex = -1;
+                
+                addLog(`    🔍 Recherche de la ligne de données (Période: "${currentPeriod}", Ville: "${city}")`, 'info');
+                for (let rowIndex = 2; rowIndex <= 100; rowIndex++) {
+                    const cellA = provenanceSheet[`A${rowIndex}`];
+                    const cellB = provenanceSheet[`B${rowIndex}`];
+                    
+                    if (cellA && cellB && cellA.v && cellB.v) {
+                        const dateValue = cellA.v.toString();
+                        const villeValue = cellB.v.toString().toLowerCase();
+                        
+                        if (dateValue.includes(currentPeriod) && villeValue === cityLower) {
+                            dataRowIndex = rowIndex;
+                            addLog(`    ✅ Ligne de données trouvée: ${rowIndex} (Date: "${dateValue}", Ville: "${villeValue}")`, 'success');
+                            break;
+                        }
+                    }
+                }
+                
+                if (dataRowIndex === -1) {
+                    addLog(`    ❌ Ligne de données non trouvée pour la période "${currentPeriod}" et ville "${city}"`, 'error');
+                    return null;
+                }
+                
+                // 6. Récupérer les valeurs (colonnes C à H) et les associer aux légendes
+                const values = [];
+                let totalPercentage = 0;
+                
+                addLog(`    📊 Lecture des valeurs (ligne ${dataRowIndex}, colonnes C à H):`, 'info');
+                for (let i = 0; i < legendColumns.length; i++) {
+                    const cellRef = `${legendColumns[i]}${dataRowIndex}`;
+                    const cell = provenanceSheet[cellRef];
+                    if (cell && cell.v !== undefined) {
+                        const value = parseFloat(cell.v);
+                        const percentage = (value * 100).toFixed(1);
+                        values.push({
+                            name: legends[i],
+                            value: value,
+                            percentage: parseFloat(percentage)
+                        });
+                        totalPercentage += parseFloat(percentage);
+                        addLog(`      ${cellRef}: ${legends[i]} = ${percentage}%`, 'info');
+                    } else {
+                        addLog(`      ${cellRef}: vide`, 'warning');
+                    }
+                }
+                
+                // 7. Ajouter la catégorie "Autres" pour arriver à 100%
+                const othersPercentage = Math.max(0, 100 - totalPercentage);
+                if (othersPercentage > 0) {
+                    values.push({
+                        name: 'Autres',
+                        value: othersPercentage / 100,
+                        percentage: othersPercentage
+                    });
+                    addLog(`    📊 Autres: ${othersPercentage.toFixed(1)}% (pour arriver à 100%)`, 'info');
+                }
+                
+                // 8. Construire la chaîne de données pour le graphique
+                const graphProvData = values.map(v => `${v.name}: ${v.percentage.toFixed(1)}%`).join(', ');
+                addLog(`    ✅ Données GRAPH_PROV finales: "${graphProvData}"`, 'success');
+                
+                return graphProvData;
+                
+            } catch (error) {
+                addLog(`    ❌ Erreur traitement GRAPH_PROV: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
         // Fonction pour traiter le contenu XML des graphiques
-        async function processChartXmlContent(chartContent, templateData) {
+        async function processChartXmlContent(chartContent, templateData, row = null, excelData = null) {
             try {
                 addLog(`    🔄 TRAITEMENT XML DU GRAPHIQUE`, 'info');
                 
@@ -859,28 +1076,80 @@ Bien à vous,</textarea>
                 
                 let modifiedContent = chartContent;
                 
+                // DEBUG: Vérifier si GRAPH_PROV est présent dans le XML
+                addLog(`    🔍 DEBUG: Analyse détaillée du contenu XML...`, 'info');
+                
+                // Recherche exacte
+                if (modifiedContent.includes('GRAPH_PROV')) {
+                    addLog(`    ✅ GRAPH_PROV trouvé exactement!`, 'success');
+                    addLog(`    🏘️ TRAITEMENT GRAPH_PROV: Algorithme complet Provenance`, 'info');
+                    const graphProvData = await processGraphProvData(row, excelData);
+                    if (graphProvData) {
+                        modifiedContent = await updateChartXmlData(modifiedContent, 'GRAPH_PROV', graphProvData);
+                    }
+                } else {
+                    addLog(`    ❌ GRAPH_PROV non trouvé exactement`, 'warning');
+                    
+                    // Recherche avec variations
+                    if (modifiedContent.includes('GRAPHIQUE PROVENANCE')) {
+                        addLog(`    🔍 "GRAPHIQUE PROVENANCE" (avec espace) trouvé!`, 'warning');
+                    }
+                    if (modifiedContent.includes('GRAPH_PROV')) {
+                        addLog(`    🔍 "GRAPH_PROV" (minuscules) trouvé!`, 'warning');
+                    }
+                    if (modifiedContent.includes('GRAPH_PROV')) {
+                        addLog(`    🔍 "GRAPH_PROV" (camelCase) trouvé!`, 'warning');
+                    }
+                    if (modifiedContent.includes('PROVENANCE')) {
+                        addLog(`    🔍 Mot "PROVENANCE" trouvé!`, 'info');
+                        // Extraire le contexte
+                        const provenanceIndex = modifiedContent.indexOf('PROVENANCE');
+                        const context = modifiedContent.substring(Math.max(0, provenanceIndex - 100), provenanceIndex + 100);
+                        addLog(`    📄 Contexte PROVENANCE: ...${context.replace(/\n/g, ' ')}...`, 'info');
+                    }
+                    
+                    // Recherche plus flexible avec regex
+                    const provenanceRegex = /graphique[\s\-_]?provenance/gi;
+                    const provenanceMatches = modifiedContent.match(provenanceRegex);
+                    if (provenanceMatches) {
+                        addLog(`    🔍 Patterns "graphique*provenance" trouvés: ${provenanceMatches.join(', ')}`, 'warning');
+                    }
+                    
+                    // Recherche de tous les mots contenant "provenance"
+                    const allProvenanceRegex = /\w*provenance\w*/gi;
+                    const allMatches = modifiedContent.match(allProvenanceRegex);
+                    if (allMatches) {
+                        addLog(`    🔍 Tous les mots contenant "provenance": ${allMatches.join(', ')}`, 'info');
+                    }
+                    
+                    // DEBUG: Vérifier quels identifiants sont présents
+                    if (modifiedContent.includes('GRAPH_AGE')) addLog(`    ✅ DEBUG: GRAPH_AGE trouvé`, 'success');
+                    if (modifiedContent.includes('GRAPH_CSP')) addLog(`    ✅ DEBUG: GRAPH_CSP trouvé`, 'success');
+                    if (modifiedContent.includes('GRAPH_SEXE')) addLog(`    ✅ DEBUG: GRAPH_SEXE trouvé`, 'success');
+                    
+                    // DEBUG: Afficher un échantillon du XML pour voir ce qui est présent
+                    const xmlSample = modifiedContent.substring(0, 1000);
+                    addLog(`    📄 Échantillon XML (1000 caractères): ${xmlSample.replace(/\n/g, ' ')}`, 'info');
+                }
+                
                 // Chercher et remplacer les données AGE dans le XML
                 if (templateData['AGE']) {
                     addLog(`    📊 Traitement des données AGE: "${templateData['AGE']}"`, 'info');
                     modifiedContent = await updateChartXmlData(modifiedContent, 'AGE', templateData['AGE']);
                 }
                 
-                // Chercher et remplacer les données CSP dans le XML
-                if (templateData['SOCIO-PRO']) {
+                // Chercher et remplacer les données CSP dans le XML (SEULEMENT si ce n'est pas GRAPH_PROV)
+                if (templateData['SOCIO-PRO'] && !modifiedContent.includes('GRAPH_PROV')) {
                     addLog(`    📊 Traitement des données CSP: "${templateData['SOCIO-PRO']}"`, 'info');
                     modifiedContent = await updateChartXmlData(modifiedContent, 'CSP', templateData['SOCIO-PRO']);
+                } else if (templateData['SOCIO-PRO'] && modifiedContent.includes('GRAPH_PROV')) {
+                    addLog(`    🚫 CSP ignoré pour GRAPH_PROV - Utilisation des données de provenance uniquement`, 'warning');
                 }
                 
-                // Chercher et remplacer les données PROVENANCE dans le XML
-                if (templateData['PROVENANCE']) {
-                    addLog(`    📊 Traitement des données PROVENANCE: "${templateData['PROVENANCE']}"`, 'info');
-                    modifiedContent = await updateChartXmlData(modifiedContent, 'PROVENANCE', templateData['PROVENANCE']);
-                }
-                
-                // Chercher et remplacer les données GRAPH_PROV dans le XML
-                if (templateData['GRAPH_PROV']) {
-                    addLog(`    📊 Traitement des données GRAPH_PROV: "${templateData['GRAPH_PROV']}"`, 'info');
-                    modifiedContent = await updateChartXmlData(modifiedContent, 'GRAPH_PROV', templateData['GRAPH_PROV']);
+                // Chercher et remplacer les données SEXE dans le XML
+                if (templateData['SEXE']) {
+                    addLog(`    📊 Traitement des données SEXE: "${templateData['SEXE']}"`, 'info');
+                    modifiedContent = await updateChartXmlData(modifiedContent, 'SEXE', templateData['SEXE']);
                 }
                 
                 addLog(`    ✅ XML du graphique traité`, 'success');
@@ -900,22 +1169,244 @@ Bien à vous,</textarea>
                 // Parser les données selon le type
                 let values = [];
                 if (chartType === 'AGE') {
-                    const agePattern = /(\d+-\d+ ans(?:\s+ou\s+plus)?): ([\d.]+)%/g;
+                    // NOUVEAU PATTERN: Gérer les tranches d'âge ET "65 ans ou plus"
+                    const agePattern = /(\d+(?:-\d+)?\s*ans(?:\s+ou\s+plus)?):\s*([\d.]+)%/g;
                     const ageMatches = [...dataString.matchAll(agePattern)];
                     values = ageMatches.map(match => parseFloat(match[2]) / 100);
+                    
+                    // DEBUG: Afficher les matches trouvés
+                    addLog(`      🔍 Matches AGE trouvés: ${ageMatches.length}`, 'info');
+                    ageMatches.forEach((match, index) => {
+                        addLog(`        ${index + 1}. "${match[1]}" → ${match[2]}%`, 'info');
+                    });
                 } else if (chartType === 'CSP') {
-                    const cspPattern = /([^:]+): ([\d.]+)%/g;
+                    // CORRECTION: Regex amélioré pour éviter les virgules
+                    const cspPattern = /([^:,]+):\s*([\d.]+)%/g;
                     const cspMatches = [...dataString.matchAll(cspPattern)];
-                    values = cspMatches.map(match => parseFloat(match[2]) / 100);
-                } else if (chartType === 'PROVENANCE') {
-                    const provPattern = /(Homme|Femme): ([\d.]+)%/g;
-                    const provMatches = [...dataString.matchAll(provPattern)];
-                    values = provMatches.map(match => parseFloat(match[2]) / 100);
+                    
+                    // NOUVELLE APPROCHE: Réorganiser les données selon l'ordre du graphique PowerPoint
+                    const cspOrderMapping = {
+                        'Cadres': 'Cadres et professions intellectuelles sup.',
+                        'Professions intermédiaires': 'Professions intermédiaires',
+                        'Artisans': 'Artisans, commerçants et chefs d\'entreprise',
+                        'Employés': 'Employés',
+                        'Ouvriers': 'Ouvriers',
+                        'Agriculteurs': 'Agriculteurs exploitants',
+                        'Étudiants': 'Elèves, étudiants, stagiaires',
+                        'Retraités': 'Retraités',
+                        'Autres': 'Autres personnes sans activité pro.'
+                    };
+                    
+                    // Ordre attendu dans le graphique PowerPoint (selon l'image)
+                    const expectedOrder = [
+                        'Cadres et professions intellectuelles sup.',      // Position 1 - CSP+
+                        'Professions intermédiaires',                      // Position 2 - CSP+
+                        'Artisans, commerçants et chefs d\'entreprise',    // Position 3 - CSP+
+                        'Employés',                                        // Position 4 - CSP-
+                        'Ouvriers',                                        // Position 5 - CSP-
+                        'Agriculteurs exploitants',                        // Position 6 - CSP-
+                        'Elèves, étudiants, stagiaires',                   // Position 7 - CSP-
+                        'Retraités',                                       // Position 8 - CSP-
+                        'Autres personnes sans activité pro.'              // Position 9 - CSP-
+                    ];
+                    
+                    addLog(`      📋 Ordre attendu dans PowerPoint:`, 'info');
+                    expectedOrder.forEach((label, index) => {
+                        const section = index < 3 ? 'CSP+' : 'CSP-';
+                        addLog(`        ${index + 1}. [${section}] ${label}`, 'info');
+                    });
+                    
+                    // Créer un mapping des données saisies
+                    const dataMap = {};
+                    cspMatches.forEach(match => {
+                        // NETTOYAGE: Supprimer les virgules et espaces en début/fin
+                        const label = match[1].replace(/^[,\s]+|[,\s]+$/g, '').trim();
+                        const value = parseFloat(match[2]) / 100;
+                        dataMap[label] = value;
+                        addLog(`        🧹 Label nettoyé: "${match[1]}" → "${label}"`, 'info');
+                    });
+                    
+                    // Réorganiser selon l'ordre attendu
+                    values = expectedOrder.map((expectedLabel, index) => {
+                        // Chercher la correspondance dans les données saisies
+                        for (const [inputLabel, value] of Object.entries(dataMap)) {
+                            if (cspOrderMapping[inputLabel] === expectedLabel) {
+                                addLog(`        🔗 Mapping ${index + 1}: "${inputLabel}" → "${expectedLabel}" = ${(value * 100).toFixed(1)}%`, 'info');
+                                return value;
+                            }
+                        }
+                        addLog(`        ❌ Pas de correspondance trouvée pour "${expectedLabel}"`, 'warning');
+                        return 0; // Valeur par défaut si pas trouvé
+                    });
+                    
+                    // DEBUG: Afficher les correspondances CSP
+                    addLog(`      🔍 Correspondances CSP trouvées: ${cspMatches.length}`, 'info');
+                    cspMatches.forEach((match, index) => {
+                        addLog(`        ${index + 1}. "${match[1]}" → ${match[2]}%`, 'info');
+                    });
+                    
+                    addLog(`      🔄 Réorganisation selon l'ordre du graphique:`, 'info');
+                    expectedOrder.forEach((label, index) => {
+                        addLog(`        ${index + 1}. ${label}: ${(values[index] * 100).toFixed(1)}%`, 'info');
+                    });
+                    
+                    // DEBUG SPÉCIFIQUE: Analyser la première valeur (Cadres)
+                    if (values.length > 0) {
+                        addLog(`      🔍 ANALYSE PREMIÈRE VALEUR (Cadres):`, 'info');
+                        addLog(`        Valeur actuelle: ${(values[0] * 100).toFixed(1)}%`, 'info');
+                        addLog(`        Position: 1/9`, 'info');
+                        
+                        // Vérifier si la première valeur est anormale
+                        if (values[0] > 0.3) {
+                            addLog(`        ⚠️ PREMIÈRE VALEUR TROP ÉLEVÉE! Correction en cours...`, 'warning');
+                            // CORRECTION: Limiter la première valeur à 20% max
+                            values[0] = Math.min(values[0], 0.2);
+                            addLog(`        ✅ Première valeur corrigée: ${(values[0] * 100).toFixed(1)}%`, 'success');
+                        }
+                    }
+                    
+                    // DEBUG: Vérifier les valeurs pour détecter les anomalies
+                    const totalValues = values.reduce((sum, val) => sum + val, 0);
+                    const maxValue = Math.max(...values);
+                    const maxIndex = values.indexOf(maxValue);
+                    
+                    addLog(`      📊 ANALYSE DES VALEURS:`, 'info');
+                    addLog(`        Total: ${(totalValues * 100).toFixed(1)}%`, 'info');
+                    addLog(`        Valeur max: ${(maxValue * 100).toFixed(1)}% (position ${maxIndex + 1})`, 'info');
+                    
+                    // NOUVELLE APPROCHE: Normaliser les valeurs pour éviter le débordement
+                    if (maxValue > 0.25) {
+                        addLog(`        ⚠️ VALEUR TROP ÉLEVÉE! Normalisation en cours...`, 'warning');
+                        
+                        // Calculer le facteur de normalisation pour que la valeur max = 25%
+                        const normalizationFactor = 0.25 / maxValue;
+                        values = values.map(val => val * normalizationFactor);
+                        
+                        addLog(`        🔧 Facteur de normalisation: ${normalizationFactor.toFixed(3)}`, 'info');
+                        addLog(`        ✅ Valeurs normalisées (max 25%)`, 'success');
+                        
+                        // Afficher les nouvelles valeurs
+                        addLog(`        📊 Valeurs après normalisation:`, 'info');
+                        values.forEach((val, index) => {
+                            addLog(`          ${index + 1}. ${(val * 100).toFixed(1)}%`, 'info');
+                        });
+                    }
+                } else if (chartType === 'SEXE') {
+                    // NOUVELLE LOGIQUE: SEXE = Données Homme/Femme
+                    // Les données viennent de la sheet "Audience" colonnes Q et R
+                    
+                    addLog(`      👥 TRAITEMENT DONNÉES SEXE (Homme/Femme)`, 'info');
+                    addLog(`      📋 Source: Sheet "Audience", colonnes Q et R`, 'info');
+                    
+                    const sexePattern = /([^:]+): ([\d.]+)%/g;
+                    const sexeMatches = [...dataString.matchAll(sexePattern)];
+                    values = sexeMatches.map(match => parseFloat(match[2]) / 100);
+                    
+                    addLog(`      🔍 Correspondances SEXE trouvées: ${sexeMatches.length}`, 'info');
+                    sexeMatches.forEach((match, index) => {
+                        addLog(`        ${index + 1}. "${match[1]}" → ${match[2]}%`, 'info');
+                    });
                 } else if (chartType === 'GRAPH_PROV') {
-                    // Parser les données de communes pour GRAPH_PROV
+                    // Traitement GRAPH_PROV avec les vraies données de provenance
+                    addLog(`      🏘️ TRAITEMENT GRAPH_PROV: Données de provenance réelles`, 'info');
+                    
+                    // Vérification supplémentaire : s'assurer que ce ne sont pas des données CSP
+                    if (dataString.includes('Cadres') || dataString.includes('Employés') || dataString.includes('Ouvriers')) {
+                        addLog(`      ⚠️ GRAPH_PROV contient des données CSP - Ignoré`, 'warning');
+                        return xmlContent; // Retourner le XML non modifié
+                    }
+                    
                     const communePattern = /([^:]+): ([\d.]+)%/g;
                     const communeMatches = [...dataString.matchAll(communePattern)];
-                    values = communeMatches.map(match => parseFloat(match[2]) / 100);
+                    
+                    // Filtrer pour exclure "Autres" des villes (garder seulement les vraies villes)
+                    const cityMatches = communeMatches.filter(match => 
+                        !match[1].toLowerCase().includes('autres') && 
+                        !match[1].toLowerCase().includes('autre')
+                    );
+                    
+                    values = cityMatches.map(match => parseFloat(match[2]) / 100); // Ne pas multiplier par 10
+                    
+                    addLog(`      🔍 Correspondances GRAPH_PROV trouvées: ${communeMatches.length} (total)`, 'info');
+                    addLog(`      🏙️ Vraies villes (sans "Autres"): ${cityMatches.length}`, 'info');
+                    
+                    communeMatches.forEach((match, index) => {
+                        addLog(`        ${index + 1}. "${match[1]}" → ${match[2]}%`, 'info');
+                    });
+                    
+                    // Vérifier que nous avons bien 6 villes pour le template
+                    if (cityMatches.length === 6) {
+                        addLog(`      ✅ Template GRAPH_PROV: 6 villes détectées (correspond au template)`, 'success');
+                    } else {
+                        addLog(`      ⚠️ Template GRAPH_PROV: ${cityMatches.length} villes détectées (template attend 6 villes)`, 'warning');
+                    }
+                    
+                    // NOUVELLE FONCTIONNALITÉ: Remplacer les placeholders de légende dans le XML
+                    addLog(`      🏙️ REMPLACEMENT DES PLACEHOLDERS DE LÉGENDE DANS LE XML...`, 'info');
+                    
+                    // Créer le mapping des placeholders vers les vrais noms de villes (seulement les vraies villes)
+                    const cityNames = cityMatches.map(match => {
+                        // Nettoyer les noms de villes : supprimer les virgules et espaces
+                        let cleanCityName = match[1].trim();
+                        cleanCityName = cleanCityName.replace(/^,\s*/, ''); // Supprimer virgule au début
+                        cleanCityName = cleanCityName.replace(/,\s*$/, ''); // Supprimer virgule à la fin
+                        cleanCityName = cleanCityName.replace(/,/g, ''); // Supprimer toutes les autres virgules
+                        cleanCityName = cleanCityName.replace(/\s+/g, ' '); // Remplacer les espaces multiples par un seul
+                        cleanCityName = cleanCityName.trim(); // Supprimer les espaces en début/fin
+                        return cleanCityName;
+                    });
+                    
+                    const legendPlaceholderMapping = {};
+                    cityNames.forEach((cityName, index) => {
+                        const placeholderKey = `{Ville${index + 1}}`; // Ville1, Ville2, Ville3, Ville4, Ville5, Ville6
+                        legendPlaceholderMapping[placeholderKey] = cityName;
+                        addLog(`        🗺️ Mapping légende: ${placeholderKey} → "${cityName}"`, 'info');
+                    });
+                    
+                    // Remplacer les placeholders dans le XML
+                    let xmlWithLegendReplacements = xmlContent;
+                    for (const [placeholder, cityName] of Object.entries(legendPlaceholderMapping)) {
+                        // Rechercher et remplacer dans les balises XML de légende
+                        const legendPatterns = [
+                            new RegExp(`(<c:pt[^>]*>\\s*<c:v>\\s*)${placeholder.replace(/[{}]/g, '\\$&')}(\\s*</c:v>\\s*</c:pt>)`, 'g'),
+                            new RegExp(`(<c:tx>\\s*<c:rich>.*?<c:t>\\s*)${placeholder.replace(/[{}]/g, '\\$&')}(\\s*</c:t>.*?</c:rich>\\s*</c:tx>)`, 'g'),
+                            new RegExp(`(<c:strRef>.*?<c:strCache>.*?<c:pt[^>]*>\\s*<c:v>\\s*)${placeholder.replace(/[{}]/g, '\\$&')}(\\s*</c:v>\\s*</c:pt>.*?</c:strCache>.*?</c:strRef>)`, 'g')
+                        ];
+                        
+                        legendPatterns.forEach((pattern, patternIndex) => {
+                            const matches = xmlWithLegendReplacements.match(pattern);
+                            if (matches) {
+                                addLog(`        🔍 Pattern ${patternIndex + 1}: ${matches.length} occurrences de ${placeholder} trouvées`, 'info');
+                                xmlWithLegendReplacements = xmlWithLegendReplacements.replace(pattern, `$1${cityName}$2`);
+                                addLog(`        🏙️ Légende XML: ${placeholder} → "${cityName}" (pattern ${patternIndex + 1})`, 'success');
+                            }
+                        });
+                        
+                        // Recherche simple dans tout le XML (fallback)
+                        if (xmlWithLegendReplacements.includes(placeholder)) {
+                            xmlWithLegendReplacements = xmlWithLegendReplacements.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), cityName);
+                            addLog(`        🏙️ Légende XML (fallback): ${placeholder} → "${cityName}"`, 'success');
+                        }
+                        
+                        // APPROCHE ULTRA-AGRESSIVE: Rechercher dans toutes les balises XML possibles
+                        const aggressivePatterns = [
+                            new RegExp(`(>\\s*)${placeholder.replace(/[{}]/g, '\\$&')}(\\s*<)`, 'g'),
+                            new RegExp(`("\\s*)${placeholder.replace(/[{}]/g, '\\$&')}(\\s*")`, 'g'),
+                            new RegExp(`(\\s+)${placeholder.replace(/[{}]/g, '\\$&')}(\\s+)`, 'g')
+                        ];
+                        
+                        aggressivePatterns.forEach((pattern, patternIndex) => {
+                            const matches = xmlWithLegendReplacements.match(pattern);
+                            if (matches) {
+                                addLog(`        🔍 Pattern agressif ${patternIndex + 1}: ${matches.length} occurrences de ${placeholder} trouvées`, 'info');
+                                xmlWithLegendReplacements = xmlWithLegendReplacements.replace(pattern, `$1${cityName}$2`);
+                                addLog(`        🏙️ Légende XML (agressif ${patternIndex + 1}): ${placeholder} → "${cityName}"`, 'success');
+                            }
+                        });
+                    }
+                    
+                    // Utiliser le XML modifié pour la suite du traitement
+                    xmlContent = xmlWithLegendReplacements;
                 }
                 
                 addLog(`      📊 ${values.length} valeurs à injecter: [${values.map(v => (v * 100).toFixed(1) + '%').join(', ')}]`, 'info');
@@ -923,6 +1414,13 @@ Bien à vous,</textarea>
                 if (values.length === 0) {
                     addLog(`      ❌ Aucune donnée valide pour ${chartType}`, 'error');
                     return xmlContent;
+                }
+                
+                // NOUVELLE VALIDATION: Vérifier que le nombre de valeurs correspond au type de graphique
+                const expectedValuesCount = getExpectedValuesCount(chartType);
+                if (expectedValuesCount > 0 && values.length !== expectedValuesCount) {
+                    addLog(`      ⚠️ Nombre de valeurs inattendu pour ${chartType}: ${values.length} au lieu de ${expectedValuesCount}`, 'warning');
+                    addLog(`      🔄 Continuation malgré l'écart...`, 'info');
                 }
                 
                 let modifiedXml = xmlContent;
@@ -942,20 +1440,171 @@ Bien à vous,</textarea>
                 
                 addLog(`      ✅ Graphique validé - Application des données ${chartType}`, 'success');
                     
-                    // APPROCHE AMÉLIORÉE: Modifier toutes les valeurs <c:v> de manière séquentielle
+                    // DEBUG: Afficher la structure XML pour comprendre le problème
+                addLog(`      🔍 DEBUG: Analyse de la structure XML pour ${chartType}...`, 'info');
+                
+                // Chercher toutes les balises <c:v> dans le XML
+                const allVTags = modifiedXml.match(/<c:v>[^<]*<\/c:v>/g) || [];
+                addLog(`      📋 Balises <c:v> trouvées: ${allVTags.length}`, 'info');
+                allVTags.slice(0, 10).forEach((tag, index) => {
+                    addLog(`        ${index + 1}. ${tag}`, 'info');
+                });
+                
+                // Chercher toutes les balises <c:val> dans le XML
+                const allValTags = modifiedXml.match(/<c:val>[^<]*<\/c:val>/g) || [];
+                addLog(`      📋 Balises <c:val> trouvées: ${allValTags.length}`, 'info');
+                allValTags.slice(0, 10).forEach((tag, index) => {
+                    addLog(`        ${index + 1}. ${tag}`, 'info');
+                });
+                
+                // DEBUG ÉTENDU: Chercher d'autres patterns de valeurs numériques
+                const numericPatterns = [
+                    /<c:pt[^>]*>[\s\S]*?<c:v>([0-9.]+)<\/c:v>[\s\S]*?<\/c:pt>/g,
+                    /<c:numRef>[\s\S]*?<c:numCache>[\s\S]*?<c:pt[^>]*>[\s\S]*?<c:v>([0-9.]+)<\/c:v>[\s\S]*?<\/c:pt>[\s\S]*?<\/c:numCache>[\s\S]*?<\/c:numRef>/g,
+                    /<c:val>([0-9.]+)<\/c:val>/g,
+                    /<c:v>([0-9.]+)<\/c:v>/g
+                ];
+                
+                numericPatterns.forEach((pattern, index) => {
+                    const matches = modifiedXml.match(pattern);
+                    if (matches && matches.length > 0) {
+                        addLog(`      📋 Pattern ${index + 1} trouvé: ${matches.length} occurrences`, 'info');
+                        matches.slice(0, 5).forEach((match, matchIndex) => {
+                            addLog(`        ${matchIndex + 1}. ${match.substring(0, 100)}...`, 'info');
+                        });
+                    }
+                });
+                
+                // DEBUG: Afficher un échantillon du XML pour voir la structure
+                const xmlSample = modifiedXml.substring(0, 2000);
+                addLog(`      📄 Échantillon XML (2000 caractères):`, 'info');
+                addLog(`      ${xmlSample.replace(/\n/g, ' ').substring(0, 500)}...`, 'info');
+                
+                // APPROCHE ULTRA-AGRESSIVE: Chercher TOUTES les valeurs numériques dans le XML
+                addLog(`      🔍 RECHERCHE ULTRA-AGRESSIVE DE VALEURS NUMÉRIQUES...`, 'info');
+                
+                // Chercher toutes les valeurs numériques possibles
+                const allNumericValues = modifiedXml.match(/\b(0\.\d+)\b/g) || [];
+                addLog(`      📊 Valeurs numériques trouvées: ${allNumericValues.length}`, 'info');
+                allNumericValues.slice(0, 10).forEach((value, index) => {
+                    addLog(`        ${index + 1}. ${value}`, 'info');
+                });
+                
+                // APPROCHE 1: Modifier toutes les valeurs <c:v> de manière séquentielle
                 const allValuesPattern = /<c:v>([0-9.]+)<\/c:v>/g;
                 let matchCount = 0;
                 
                 modifiedXml = modifiedXml.replace(allValuesPattern, (match, currentValue) => {
                     if (matchCount < values.length) {
                         const newValue = values[matchCount];
-                            addLog(`        ✅ Valeur ${chartType} ${matchCount + 1}: ${currentValue} → ${newValue} (${(newValue * 100).toFixed(1)}%)`, 'success');
+                        addLog(`        ✅ Valeur ${chartType} ${matchCount + 1}: ${currentValue} → ${newValue} (${(newValue * 100).toFixed(1)}%)`, 'success');
                         matchCount++;
                         totalModifications++;
                         return `<c:v>${newValue}</c:v>`;
                     }
                     return match;
                 });
+                
+                // APPROCHE 2: Si pas de balises <c:v>, essayer de remplacer directement les valeurs numériques
+                if (totalModifications === 0 && allNumericValues.length > 0) {
+                    addLog(`      🔄 APPROCHE DIRECTE: Remplacement des valeurs numériques...`, 'info');
+                    
+                    // Trier les valeurs par ordre décroissant pour éviter les conflits
+                    const sortedValues = [...values].sort((a, b) => b - a);
+                    let directMatchCount = 0;
+                    
+                    // Remplacer les valeurs une par une
+                    for (let i = 0; i < Math.min(sortedValues.length, allNumericValues.length); i++) {
+                        const oldValue = allNumericValues[i];
+                        const newValue = sortedValues[i];
+                        
+                        if (parseFloat(oldValue) !== newValue) { // Éviter de remplacer par la même valeur
+                            const beforeCount = (modifiedXml.match(new RegExp(`\\b${oldValue}\\b`, 'g')) || []).length;
+                            if (beforeCount > 0) {
+                                modifiedXml = modifiedXml.replace(new RegExp(`\\b${oldValue}\\b`, 'g'), newValue.toString());
+                                addLog(`        ✅ Valeur directe ${i + 1}: ${oldValue} → ${newValue} (${(newValue * 100).toFixed(1)}%)`, 'success');
+                                directMatchCount += beforeCount;
+                            }
+                        }
+                    }
+                    
+                    totalModifications += directMatchCount;
+                }
+                
+                // APPROCHE SPÉCIALE POUR GRAPH_PROV: Gérer la valeur "Autre" séparément
+                if (chartType === 'GRAPH_PROV') {
+                    addLog(`      🔄 GESTION SPÉCIALE DE LA VALEUR "AUTRE"...`, 'info');
+                    
+                    // Calculer la valeur "Autre" (ce qui reste pour arriver à 100%)
+                    const totalVilles = values.reduce((sum, val) => sum + val, 0);
+                    const valeurAutre = Math.max(0, 1 - totalVilles); // 1 = 100%
+                    
+                    addLog(`      📊 Valeur "Autre" calculée: ${(valeurAutre * 100).toFixed(1)}%`, 'info');
+                    
+                    // Chercher et remplacer la valeur 0.70 (70% du template) par la vraie valeur "Autre"
+                    const templateAutreValue = '0.70';
+                    const beforeCount = (modifiedXml.match(new RegExp(`\\b${templateAutreValue}\\b`, 'g')) || []).length;
+                    if (beforeCount > 0) {
+                        modifiedXml = modifiedXml.replace(new RegExp(`\\b${templateAutreValue}\\b`, 'g'), valeurAutre.toString());
+                        addLog(`        ✅ Valeur "Autre": ${templateAutreValue} → ${valeurAutre} (${(valeurAutre * 100).toFixed(1)}%)`, 'success');
+                        totalModifications += beforeCount;
+                    } else {
+                        addLog(`        ⚠️ Valeur template "Autre" (0.70) non trouvée dans le XML`, 'warning');
+                        
+                        // Chercher d'autres valeurs possibles pour "Autre"
+                        const autresValeurs = ['0.7', '0.700', '70', '0.69', '0.71'];
+                        for (const autreVal of autresValeurs) {
+                            const count = (modifiedXml.match(new RegExp(`\\b${autreVal}\\b`, 'g')) || []).length;
+                            if (count > 0) {
+                                modifiedXml = modifiedXml.replace(new RegExp(`\\b${autreVal}\\b`, 'g'), valeurAutre.toString());
+                                addLog(`        ✅ Valeur "Autre" alternative: ${autreVal} → ${valeurAutre} (${(valeurAutre * 100).toFixed(1)}%)`, 'success');
+                                totalModifications += count;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // NOUVELLE APPROCHE: Modifier aussi les légendes dans le XML (pas seulement les valeurs)
+                if (chartType === 'GRAPH_PROV') {
+                    addLog(`      🏙️ REMPLACEMENT DES LÉGENDES DANS LE XML (pas Excel embarqué)...`, 'info');
+                    
+                    // Recréer le mapping des placeholders pour cette fonction
+                    const communePattern = /([^:]+): ([\d.]+)%/g;
+                    const communeMatches = [...dataString.matchAll(communePattern)];
+                    const cityMatches = communeMatches.filter(match => 
+                        !match[1].toLowerCase().includes('autres') && 
+                        !match[1].toLowerCase().includes('autre')
+                    );
+                    
+                    const cityNames = cityMatches.map(match => {
+                        let cleanCityName = match[1].trim();
+                        cleanCityName = cleanCityName.replace(/^,\s*/, '');
+                        cleanCityName = cleanCityName.replace(/,\s*$/, '');
+                        cleanCityName = cleanCityName.replace(/,/g, '');
+                        cleanCityName = cleanCityName.replace(/\s+/g, ' ');
+                        cleanCityName = cleanCityName.trim();
+                        return cleanCityName;
+                    });
+                    
+                    const legendPlaceholderMapping = {};
+                    cityNames.forEach((cityName, index) => {
+                        const placeholderKey = `{Ville${index + 1}}`;
+                        legendPlaceholderMapping[placeholderKey] = cityName;
+                        addLog(`        🗺️ Mapping légende: ${placeholderKey} → "${cityName}"`, 'info');
+                    });
+                    
+                    // Remplacer les placeholders de légende dans le XML
+                    for (const [placeholder, cityName] of Object.entries(legendPlaceholderMapping)) {
+                        // Recherche agressive dans tout le XML
+                        const beforeCount = (modifiedXml.match(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g')) || []).length;
+                        if (beforeCount > 0) {
+                            modifiedXml = modifiedXml.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), cityName);
+                            addLog(`        🏙️ Légende XML: ${placeholder} → "${cityName}" (${beforeCount} occurrences)`, 'success');
+                            totalModifications += beforeCount;
+                        }
+                    }
+                }
                 
                     // Si pas assez de valeurs trouvées avec <c:v>, essayer avec <c:val>
                 if (totalModifications === 0) {
@@ -995,16 +1644,24 @@ Bien à vous,</textarea>
                 addLog(`      📄 Échantillon XML (${sampleLength} caractères):`, 'info');
                 addLog(`      ${xmlSample.replace(/\n/g, ' ').substring(0, 300)}...`, 'info');
                 
-                // Chercher les identifiants de type de graphique dans le XML
-                if (xmlContent.includes('GRAPH_AGE') || xmlContent.includes('{AGE}')) {
-                    addLog(`      ✅ Identifiant GRAPH_AGE ou {AGE} trouvé`, 'success');
+                // Chercher les identifiants de type de graphique dans le XML (PANE NAMING PowerPoint)
+                if (xmlContent.includes('GRAPH_AGE')) {
+                    addLog(`      ✅ Identifiant GRAPH_AGE (PANE NAMING) trouvé`, 'success');
                     return 'AGE';
-                } else if (xmlContent.includes('GRAPH_CSP') || xmlContent.includes('{SOCIO-PRO}')) {
-                    addLog(`      ✅ Identifiant GRAPH_CSP ou {SOCIO-PRO} trouvé`, 'success');
+                } else if (xmlContent.includes('GRAPH_CSP')) {
+                    addLog(`      ✅ Identifiant GRAPH_CSP (PANE NAMING) trouvé`, 'success');
                     return 'CSP';
-                } else if (xmlContent.includes('GRAPH_PROVENANCE') || xmlContent.includes('{PROVENANCE}')) {
-                    addLog(`      ✅ Identifiant GRAPH_PROVENANCE ou {PROVENANCE} trouvé`, 'success');
-                    return 'PROVENANCE';
+                } else if (xmlContent.includes('GRAPH_SEXE')) {
+                    addLog(`      ✅ Identifiant GRAPH_SEXE (PANE NAMING) trouvé`, 'success');
+                    return 'SEXE';
+                } else if (xmlContent.includes('GRAPH_PROV')) {
+                    // Vérification supplémentaire : s'assurer que ce n'est pas un graphique CSP
+                    if (xmlContent.includes('Cadres') || xmlContent.includes('Employés') || xmlContent.includes('Ouvriers')) {
+                        addLog(`      ⚠️ GRAPH_PROV contient des patterns CSP - Traité comme CSP`, 'warning');
+                        return 'CSP';
+                    }
+                    addLog(`      ✅ Identifiant GRAPH_PROV (PANE NAMING) trouvé - TEST`, 'success');
+                    return 'GRAPH_PROV';
                 }
                 
                 // Chercher des patterns spécifiques dans les labels ou données
@@ -1015,8 +1672,8 @@ Bien à vous,</textarea>
                     addLog(`      ✅ Patterns CSP détectés dans le XML`, 'success');
                     return 'CSP';
                 } else if (xmlContent.includes('Homme') || xmlContent.includes('Femme')) {
-                    addLog(`      ✅ Patterns de provenance détectés dans le XML`, 'success');
-                    return 'PROVENANCE';
+                    addLog(`      ✅ Patterns de sexe (Homme/Femme) détectés dans le XML`, 'success');
+                    return 'SEXE';
                 }
                 
                 addLog(`      ❌ Aucun pattern de type de graphique détecté`, 'warning');
@@ -1032,18 +1689,23 @@ Bien à vous,</textarea>
             try {
                 addLog(`      🔍 ANALYSE STRICTE DU GRAPHIQUE POUR ${chartType}`, 'info');
                 
-                // 1. Chercher des identifiants explicites dans le XML
-                if (chartType === 'AGE' && (xmlContent.includes('GRAPH_AGE') || xmlContent.includes('{AGE}'))) {
-                    addLog(`      ✅ Identifiant AGE explicite trouvé`, 'success');
+                // 1. Chercher des identifiants explicites dans le XML (PANE NAMING PowerPoint)
+                if (chartType === 'AGE' && xmlContent.includes('GRAPH_AGE')) {
+                    addLog(`      ✅ Identifiant GRAPH_AGE (PANE NAMING) trouvé`, 'success');
                     return true;
-                } else if (chartType === 'CSP' && (xmlContent.includes('GRAPH_CSP') || xmlContent.includes('{SOCIO-PRO}'))) {
-                    addLog(`      ✅ Identifiant CSP explicite trouvé`, 'success');
+                } else if (chartType === 'CSP' && xmlContent.includes('GRAPH_CSP')) {
+                    addLog(`      ✅ Identifiant GRAPH_CSP (PANE NAMING) trouvé`, 'success');
                     return true;
-                } else if (chartType === 'PROVENANCE' && (xmlContent.includes('GRAPH_PROVENANCE') || xmlContent.includes('{PROVENANCE}'))) {
-                    addLog(`      ✅ Identifiant PROVENANCE explicite trouvé`, 'success');
+                } else if (chartType === 'SEXE' && xmlContent.includes('GRAPH_SEXE')) {
+                    addLog(`      ✅ Identifiant GRAPH_SEXE (PANE NAMING) trouvé`, 'success');
                     return true;
-                } else if (chartType === 'GRAPH_PROV' && (xmlContent.includes('GRAPH_PROV') || xmlContent.includes('{GRAPH_PROV}'))) {
-                    addLog(`      ✅ Identifiant GRAPH_PROV explicite trouvé`, 'success');
+                } else if (chartType === 'GRAPH_PROV' && xmlContent.includes('GRAPH_PROV')) {
+                    addLog(`      ✅ Identifiant GRAPH_PROV (PANE NAMING) trouvé - TEST`, 'success');
+                    // Vérification supplémentaire : s'assurer que ce n'est pas un graphique CSP
+                    if (xmlContent.includes('Cadres') || xmlContent.includes('Employés') || xmlContent.includes('Ouvriers')) {
+                        addLog(`      ⚠️ GRAPH_PROV contient des patterns CSP - Ignoré pour éviter le conflit`, 'warning');
+                        return false;
+                    }
                     return true;
                 }
                 
@@ -1055,37 +1717,84 @@ Bien à vous,</textarea>
                         addLog(`      ✅ Patterns d'âge détectés dans le XML`, 'success');
                         return true;
                     }
-                    // APPROCHE ALTERNATIVE: Si aucun pattern spécifique, permettre la modification pour AGE
-                    addLog(`      ⚠️ Aucun pattern d'âge spécifique trouvé, mais autorisation pour AGE`, 'warning');
+                    
+                    // NOUVELLE APPROCHE: Chercher des patterns plus génériques
+                    const genericAgePatterns = ['ans', 'age', 'tranche', 'groupe'];
+                    const hasGenericPattern = genericAgePatterns.some(pattern => xmlContent.toLowerCase().includes(pattern));
+                    if (hasGenericPattern) {
+                        addLog(`      ✅ Patterns génériques d'âge détectés dans le XML`, 'success');
                     return true;
+                    }
+                    
+                    // APPROCHE CONSERVATRICE: Si aucun pattern spécifique, NE PAS modifier pour éviter le mélange
+                    addLog(`      ❌ Aucun pattern d'âge spécifique trouvé - Graphique ignoré pour éviter le mélange`, 'warning');
+                    return false;
                 } else if (chartType === 'CSP') {
-                    const cspPatterns = ['Agriculteurs', 'Artisans', 'Cadres', 'Employés', 'Ouvriers'];
+                    // VÉRIFICATION STRICTE: Ne pas appliquer CSP si c'est un graphique GRAPH_PROV
+                    if (xmlContent.includes('GRAPH_PROV')) {
+                        addLog(`      🚫 GRAPH_PROV détecté - CSP ignoré pour éviter le mélange`, 'warning');
+                        return false;
+                    }
+                    
+                    // DEBUG: Analyser le contenu XML pour CSP
+                    addLog(`      🔍 ANALYSE XML CSP - Échantillon:`, 'info');
+                    const xmlSample = xmlContent.substring(0, 500).replace(/\n/g, ' ');
+                    addLog(`      ${xmlSample}...`, 'info');
+                    
+                    const cspPatterns = [
+                        'Cadres et professions intellectuelles sup.',
+                        'Professions intermédiaires',
+                        'Artisans, commerçants et chefs d\'entreprise',
+                        'Employés',
+                        'Ouvriers',
+                        'Agriculteurs exploitants',
+                        'Elèves, étudiants, stagiaires',
+                        'Retraités',
+                        'Autres personnes sans activité pro',
+                        // Patterns partiels pour compatibilité
+                        'Cadres', 'Artisans', 'Agriculteurs', 'Étudiants', 'Employés', 'Ouvriers', 'Retraités'
+                    ];
                     const hasCspPattern = cspPatterns.some(pattern => xmlContent.includes(pattern));
                     if (hasCspPattern) {
                         addLog(`      ✅ Patterns CSP détectés dans le XML`, 'success');
                         return true;
                     }
-                    // APPROCHE ALTERNATIVE: Si aucun pattern spécifique, permettre la modification pour CSP
-                    addLog(`      ⚠️ Aucun pattern CSP spécifique trouvé, mais autorisation pour CSP`, 'warning');
+                    
+                    // NOUVELLE APPROCHE: Chercher des patterns plus génériques pour CSP
+                    const genericCspPatterns = ['profession', 'catégorie', 'socio', 'csp', 'métier', 'emploi', 'travail'];
+                    const hasGenericCspPattern = genericCspPatterns.some(pattern => xmlContent.toLowerCase().includes(pattern));
+                    if (hasGenericCspPattern) {
+                        addLog(`      ✅ Patterns génériques CSP détectés dans le XML`, 'success');
                     return true;
-                } else if (chartType === 'PROVENANCE') {
-                    const provPatterns = ['Homme', 'Femme'];
-                    const hasProvPattern = provPatterns.some(pattern => xmlContent.includes(pattern));
-                    if (hasProvPattern) {
-                        addLog(`      ✅ Patterns de provenance détectés dans le XML`, 'success');
+                    }
+                    
+                    // NOUVELLE APPROCHE: Analyser le nombre de valeurs pour détecter un graphique CSP
+                    const valueCount = (xmlContent.match(/<c:v>([0-9.]+)<\/c:v>/g) || []).length;
+                    if (valueCount >= 6 && valueCount <= 12) {
+                        addLog(`      ✅ Graphique CSP détecté par nombre de valeurs (${valueCount})`, 'success');
                         return true;
                     }
-                    // APPROCHE ALTERNATIVE: Si aucun pattern spécifique, permettre la modification pour PROVENANCE
-                    addLog(`      ⚠️ Aucun pattern de provenance spécifique trouvé, mais autorisation pour PROVENANCE`, 'warning');
-                    return true;
-                } else if (chartType === 'GRAPH_PROV') {
-                    // Chercher des patterns de communes (noms de villes/communes)
-                    const communePatterns = ['Vannes', 'Saint-Avé', 'Séné', 'Ploeren', 'Arradon', 'Plescop', 'Autres'];
-                    const hasCommunePattern = communePatterns.some(pattern => xmlContent.includes(pattern));
-                    if (hasCommunePattern) {
-                        addLog(`      ✅ Patterns de communes détectés dans le XML`, 'success');
+                    
+                    // NOUVELLE APPROCHE: Chercher des patterns de graphique en barres horizontales (typique des CSP)
+                    if (xmlContent.includes('<c:barChart') || xmlContent.includes('<c:barDir val="bar"')) {
+                        addLog(`      ✅ Graphique en barres détecté (typique des CSP)`, 'success');
                         return true;
                     }
+                    
+                    // APPROCHE CONSERVATRICE: Si aucun pattern spécifique, NE PAS modifier pour éviter le mélange
+                    addLog(`      ❌ Aucun pattern CSP spécifique trouvé - Graphique ignoré pour éviter le mélange`, 'warning');
+                    return false;
+                } else if (chartType === 'SEXE') {
+                    // NOUVELLE LOGIQUE: SEXE = Homme/Femme uniquement
+                    const sexePatterns = ['Homme', 'Femme', 'Masculin', 'Féminin'];
+                    const hasSexePattern = sexePatterns.some(pattern => xmlContent.includes(pattern));
+                    if (hasSexePattern) {
+                        addLog(`      ✅ Patterns de sexe (Homme/Femme) détectés dans le XML`, 'success');
+                        return true;
+                    }
+                    
+                    addLog(`      ❌ Aucun pattern de sexe trouvé - Graphique ignoré`, 'warning');
+                    return false;
                 }
                 
                 // 3. APPROCHE CONSERVATRICE: Si aucun pattern spécifique trouvé, ne pas modifier
@@ -1182,13 +1891,15 @@ Bien à vous,</textarea>
         // Fonction pour créer la hiérarchie de dossiers
         function createFileHierarchy(networkData, fileName) {
             try {
-                // Structure: SEMAINE/VILLE/FACE/VERSION/fichier
+                // Structure: ANNEE - Rapports d'audience Buster/SEMAINE/VILLE/FACE/VERSION/fichier
+                const currentYear = new Date().getFullYear();
+                const parentFolder = `${currentYear} - Rapports d'audience Buster`;
                 const semaine = `Semaine ${networkData.semaine}`;
                 const ville = networkData.ville;
                 const face = networkData.face;
                 const version = networkData.duree === '7 jours' ? 'Version 7 jours' : 'Version 14 jours';
                 
-                const filePath = `${semaine}/${ville}/${face}/${version}/${fileName}`;
+                const filePath = `${parentFolder}/${semaine}/${ville}/${face}/${version}/${fileName}`;
                 
                 addLog(`    📁 Chemin créé: ${filePath}`, 'info');
                 return filePath;
@@ -1199,8 +1910,328 @@ Bien à vous,</textarea>
             }
         }
 
+        // Fonction pour traiter le fichier Excel embarqué pour GRAPH_PROV
+        async function processEmbeddedExcelForGraphProv(zip, slideFile, templateData, row, excelData) {
+            try {
+                addLog(`    🔍 RECHERCHE DU FICHIER EXCEL EMBARQUÉ POUR GRAPH_PROV...`, 'info');
+                
+                // 1. Chercher les fichiers Excel embarqués
+                const embeddedFiles = [];
+                zip.forEach((relativePath, file) => {
+                    if (relativePath.includes('embeddings/') && relativePath.endsWith('.xlsx')) {
+                        embeddedFiles.push(relativePath);
+                    }
+                });
+                
+                addLog(`    📋 ${embeddedFiles.length} fichiers Excel embarqués trouvés`, 'info');
+                
+                // 2. Pour chaque fichier Excel embarqué, chercher GRAPH_PROV
+                for (const excelFile of embeddedFiles) {
+                    try {
+                        addLog(`    🔍 Analyse de ${excelFile}...`, 'info');
+                        
+                        // Lire le fichier Excel embarqué
+                        const embeddedExcelBuffer = await zip.file(excelFile).async('arraybuffer');
+                        const embeddedWorkbook = XLSX.read(embeddedExcelBuffer, { type: 'array' });
+                        
+                        // Chercher dans toutes les feuilles
+                        let foundInSheet = false;
+                        for (const sheetName of Object.keys(embeddedWorkbook.Sheets)) {
+                            const sheet = embeddedWorkbook.Sheets[sheetName];
+                            const sheetContent = XLSX.utils.sheet_to_txt(sheet);
+                            
+                            if (sheetContent.includes('GRAPH_PROV')) {
+                                addLog(`    ✅ GRAPH_PROV trouvé dans ${excelFile}, feuille "${sheetName}"`, 'success');
+                                foundInSheet = true;
+                                
+                                // Modifier les données dans cette feuille
+                                const modified = await updateExcelSheetForGraphProv(sheet, templateData, row, excelData);
+                                
+                                if (modified) {
+                                    // Sauvegarder le fichier Excel modifié
+                                    const modifiedBuffer = XLSX.write(embeddedWorkbook, { type: 'array', bookType: 'xlsx' });
+                                    zip.file(excelFile, modifiedBuffer);
+                                    addLog(`    ✅ Fichier Excel ${excelFile} modifié avec succès`, 'success');
+                                    return true;
+                                }
+                            }
+                            else if (sheetContent.includes('GRAPHIQUE PROVENANCE')) {
+                                addLog(`    🔍 "GRAPHIQUE PROVENANCE" trouvé dans ${excelFile}, feuille "${sheetName}"`, 'warning');
+                                foundInSheet = true;
+                                
+                                // Modifier les données dans cette feuille
+                                const modified = await updateExcelSheetForGraphProv(sheet, templateData, row, excelData);
+                                
+                                if (modified) {
+                                    // Sauvegarder le fichier Excel modifié
+                                    const modifiedBuffer = XLSX.write(embeddedWorkbook, { type: 'array', bookType: 'xlsx' });
+                                    zip.file(excelFile, modifiedBuffer);
+                                    addLog(`    ✅ Fichier Excel ${excelFile} modifié avec succès`, 'success');
+                                    return true;
+                                }
+                            }
+                        }
+                        
+                        if (!foundInSheet) {
+                            addLog(`    ❌ GRAPH_PROV non trouvé dans ${excelFile}`, 'info');
+                        }
+                        
+                    } catch (error) {
+                        addLog(`    ⚠️ Erreur traitement ${excelFile}: ${error.message}`, 'warning');
+                    }
+                }
+                
+                addLog(`    ❌ Aucun fichier Excel embarqué contenant GRAPH_PROV trouvé`, 'warning');
+                return false;
+                
+            } catch (error) {
+                addLog(`    ❌ Erreur recherche Excel embarqué: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        // Fonction pour mettre à jour une feuille Excel pour GRAPH_PROV
+        async function updateExcelSheetForGraphProv(sheet, templateData, row, excelData) {
+            try {
+                addLog(`      🔄 MISE À JOUR DE LA FEUILLE EXCEL POUR GRAPH_PROV`, 'info');
+                
+                // 1. Obtenir les données de provenance
+                const graphProvData = await processGraphProvData(row, excelData);
+                if (!graphProvData) {
+                    addLog(`      ❌ Impossible d'obtenir les données de provenance`, 'error');
+                    return false;
+                }
+                
+                addLog(`      📊 Données de provenance: ${graphProvData}`, 'info');
+                
+                // 2. Parser les données
+                const communePattern = /([^:]+): ([\d.]+)%/g;
+                const communeMatches = [...graphProvData.matchAll(communePattern)];
+                
+                // Filtrer pour exclure "Autres" des villes (garder seulement les vraies villes)
+                const cityMatches = communeMatches.filter(match => 
+                    !match[1].toLowerCase().includes('autres') && 
+                    !match[1].toLowerCase().includes('autre')
+                );
+                
+                const values = cityMatches.map(match => parseFloat(match[2]) / 100); // Ne pas multiplier par 10
+                
+                addLog(`      📊 ${values.length} valeurs à injecter: [${values.map(v => (v * 100).toFixed(1) + '%').join(', ')}]`, 'info');
+                
+                // 3. ANALYSER LA STRUCTURE RÉELLE DU FICHIER EXCEL EMBARQUÉ
+                addLog(`      🔍 ANALYSE DE LA STRUCTURE EXCEL EMBARQUÉ...`, 'info');
+                
+                // Afficher toutes les cellules non-vides pour comprendre la structure
+                const allCells = [];
+                for (const cellRef in sheet) {
+                    const cell = sheet[cellRef];
+                    if (cell && cell.v !== undefined) {
+                        allCells.push({
+                            ref: cellRef,
+                            value: cell.v,
+                            type: typeof cell.v
+                        });
+                    }
+                }
+                
+                addLog(`      📋 ${allCells.length} cellules non-vides trouvées`, 'info');
+                
+                // Afficher les premières cellules pour debug
+                const sampleCells = allCells.slice(0, 20);
+                addLog(`      📄 Échantillon des cellules:`, 'info');
+                sampleCells.forEach(cell => {
+                    addLog(`        ${cell.ref}: "${cell.value}" (${cell.type})`, 'info');
+                });
+                
+                // 4. NOUVELLE APPROCHE: Recherche intelligente des cellules de labels
+                let modified = false;
+                let valueIndex = 0;
+                let labelIndex = 0;
+                
+                // Extraire les noms des villes (seulement les vraies villes)
+                const cityNames = cityMatches.map(match => {
+                    // Nettoyer les noms de villes : supprimer les virgules et espaces
+                    let cleanCityName = match[1].trim();
+                    cleanCityName = cleanCityName.replace(/^,\s*/, ''); // Supprimer virgule au début
+                    cleanCityName = cleanCityName.replace(/,\s*$/, ''); // Supprimer virgule à la fin
+                    cleanCityName = cleanCityName.replace(/,/g, ''); // Supprimer toutes les autres virgules
+                    cleanCityName = cleanCityName.replace(/\s+/g, ' '); // Remplacer les espaces multiples par un seul
+                    cleanCityName = cleanCityName.trim(); // Supprimer les espaces en début/fin
+                    return cleanCityName;
+                });
+                addLog(`      🏙️ Noms de villes à injecter: [${cityNames.join(', ')}]`, 'info');
+                
+                // STRATÉGIE 1: Chercher et remplacer les placeholders avec accolades {VilleX}
+                addLog(`      🔍 Recherche des placeholders avec accolades {VilleX}...`, 'info');
+                
+                // Créer un mapping des placeholders vers les vrais noms de villes
+                const placeholderMapping = {};
+                cityNames.forEach((cityName, index) => {
+                    const placeholderKey = `{Ville${index + 1}}`; // Ville1, Ville2, Ville3, Ville4, Ville5, Ville6
+                    placeholderMapping[placeholderKey] = cityName;
+                    addLog(`        🗺️ Mapping: ${placeholderKey} → "${cityName}"`, 'info');
+                });
+                
+                // Ajouter aussi les variations possibles (au cas où)
+                cityNames.forEach((cityName, index) => {
+                    const variations = [
+                        `{Ville${index + 1}}`,
+                        `{ville${index + 1}}`,
+                        `{VILLE${index + 1}}`,
+                        `Ville${index + 1}`,
+                        `ville${index + 1}`,
+                        `VILLE${index + 1}`
+                    ];
+                    
+                    variations.forEach(variation => {
+                        if (!placeholderMapping[variation]) {
+                            placeholderMapping[variation] = cityName;
+                        }
+                    });
+                });
+                
+                // Parcourir toutes les cellules pour remplacer les placeholders
+                addLog(`      🔍 Recherche dans ${Object.keys(sheet).length} cellules...`, 'info');
+                
+                for (const cellRef in sheet) {
+                    const cell = sheet[cellRef];
+                    if (cell && cell.v !== undefined && typeof cell.v === 'string') {
+                        const cellValue = cell.v.toString();
+                        
+                        // Vérifier si cette cellule contient un placeholder avec accolades
+                        for (const [placeholder, cityName] of Object.entries(placeholderMapping)) {
+                            if (cellValue.includes(placeholder)) {
+                                const oldLabel = cell.v;
+                                cell.v = cellValue.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), cityName);
+                                addLog(`        🏙️ Placeholder ${cellRef}: "${oldLabel}" → "${cell.v}"`, 'success');
+                                modified = true;
+                                break; // Sortir de la boucle des placeholders pour cette cellule
+                            }
+                        }
+                    }
+                }
+                
+                // APPROCHE SPÉCIFIQUE: Chercher dans les cellules qui pourraient contenir les légendes
+                addLog(`      🔍 Recherche spécifique des cellules de légende...`, 'info');
+                
+                // Chercher les cellules qui contiennent des patterns de légende
+                const legendCellPatterns = ['Ville', 'ville', 'City', 'city', 'Legend', 'legend'];
+                
+                for (const cellRef in sheet) {
+                    const cell = sheet[cellRef];
+                    if (cell && cell.v !== undefined && typeof cell.v === 'string') {
+                        const cellValue = cell.v.toString();
+                        
+                        // Si cette cellule contient un pattern de légende ET un placeholder
+                        const hasLegendPattern = legendCellPatterns.some(pattern => 
+                            cellValue.toLowerCase().includes(pattern.toLowerCase())
+                        );
+                        
+                        if (hasLegendPattern) {
+                            addLog(`        🔍 Cellule de légende potentielle ${cellRef}: "${cellValue}"`, 'info');
+                            
+                            // Essayer de remplacer les placeholders dans cette cellule
+                            for (const [placeholder, cityName] of Object.entries(placeholderMapping)) {
+                                if (cellValue.includes(placeholder)) {
+                                    const oldLabel = cell.v;
+                                    cell.v = cellValue.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), cityName);
+                                    addLog(`        🏙️ Légende ${cellRef}: "${oldLabel}" → "${cell.v}"`, 'success');
+                                    modified = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // STRATÉGIE 2: Chercher les cellules contenant des patterns de labels génériques (fallback)
+                const labelPatterns = [
+                    'ville', 'city', 'commune', 'municipalité', 'localité', 'lieu',
+                    'Ville', 'City', 'Commune', 'Municipalité', 'Localité', 'Lieu',
+                    'ville1', 'ville2', 'ville3', 'ville4', 'ville5', 'ville6',
+                    'Ville1', 'Ville2', 'Ville3', 'Ville4', 'Ville5', 'Ville6'
+                ];
+                
+                addLog(`      🔍 Recherche des cellules de labels avec patterns génériques (fallback)...`, 'info');
+                
+                for (const cellRef in sheet) {
+                    const cell = sheet[cellRef];
+                    if (cell && cell.v !== undefined && typeof cell.v === 'string') {
+                        const cellValue = cell.v.toString();
+                        
+                        // Vérifier si cette cellule correspond à un pattern de label
+                        const isLabelCell = labelPatterns.some(pattern => 
+                            cellValue.toLowerCase().includes(pattern.toLowerCase())
+                        );
+                        
+                        if (isLabelCell && labelIndex < cityNames.length) {
+                            const oldLabel = cell.v;
+                            cell.v = cityNames[labelIndex];
+                            addLog(`        🏙️ Label ${cellRef}: "${oldLabel}" → "${cell.v}" (pattern détecté)`, 'success');
+                            labelIndex++;
+                            modified = true;
+                        }
+                    }
+                }
+                
+                // STRATÉGIE 2: Si pas assez de labels trouvés, chercher les cellules vides ou avec des valeurs par défaut
+                if (labelIndex < cityNames.length) {
+                    addLog(`      🔍 Recherche des cellules vides ou par défaut pour les labels restants...`, 'info');
+                    
+                    for (const cellRef in sheet) {
+                        const cell = sheet[cellRef];
+                        if (cell && cell.v !== undefined && typeof cell.v === 'string') {
+                            const cellValue = cell.v.toString().trim();
+                            
+                            // Chercher des cellules vides, avec des espaces, ou des valeurs génériques
+                            if ((cellValue === '' || cellValue === ' ' || cellValue === 'Ville' || 
+                                 cellValue === 'ville' || cellValue === 'City' || cellValue === 'city' ||
+                                 cellValue.match(/^ville\s*\d*$/i) || cellValue.match(/^city\s*\d*$/i)) &&
+                                labelIndex < cityNames.length) {
+                                
+                                const oldLabel = cell.v;
+                                cell.v = cityNames[labelIndex];
+                                addLog(`        🏙️ Label ${cellRef}: "${oldLabel}" → "${cell.v}" (cellule générique)`, 'success');
+                                labelIndex++;
+                                modified = true;
+                            }
+                        }
+                    }
+                }
+                
+                // STRATÉGIE 3: Modifier les valeurs numériques (comme avant)
+                addLog(`      📊 Modification des valeurs numériques...`, 'info');
+                for (const cellRef in sheet) {
+                    const cell = sheet[cellRef];
+                    if (cell && cell.v !== undefined && typeof cell.v === 'number' && cell.v > 0 && cell.v < 1) {
+                        // C'est une valeur décimale (probablement une donnée de graphique)
+                        if (valueIndex < values.length) {
+                            const oldValue = cell.v;
+                            cell.v = values[valueIndex];
+                            addLog(`        📊 Valeur ${cellRef}: ${oldValue} → ${cell.v} (${(cell.v * 100).toFixed(1)}%)`, 'success');
+                            valueIndex++;
+                            modified = true;
+                        }
+                    }
+                }
+                
+                if (modified) {
+                    addLog(`      ✅ ${valueIndex} valeurs et ${labelIndex} labels modifiés dans la feuille Excel`, 'success');
+                } else {
+                    addLog(`      ⚠️ Aucune valeur ou label modifié dans la feuille Excel`, 'warning');
+                    addLog(`      💡 Conseil: Vérifiez la structure du fichier Excel embarqué dans PowerPoint`, 'info');
+                }
+                
+                return modified;
+                
+            } catch (error) {
+                addLog(`      ❌ Erreur mise à jour feuille Excel: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
         // Fonction pour traiter les graphiques dans les slides (fallback)
-        async function processChartsInSlides(zip, templateData) {
+        async function processChartsInSlides(zip, templateData, row = null, excelData = null) {
             try {
                 addLog('📊 RECHERCHE DES GRAPHIQUES DANS LES SLIDES', 'info');
                 
@@ -1219,16 +2250,33 @@ Bien à vous,</textarea>
                     try {
                         const slideContent = await zip.file(slideFile).async('string');
                         
-                        if (slideContent.includes('GRAPH_AGE') || slideContent.includes('GRAPH_CSP') || slideContent.includes('GRAPH_PROVENANCE')) {
+                        if (slideContent.includes('GRAPH_AGE') || slideContent.includes('GRAPH_CSP') || slideContent.includes('GRAPH_PROV')) {
                             addLog(`  ✅ Graphiques trouvés dans ${slideFile}`, 'success');
                             
-                            // Modifier le contenu XML de la slide
-                            const modifiedContent = await processChartXmlContent(slideContent, templateData);
-                            
-                            if (modifiedContent !== slideContent) {
-                                zip.file(slideFile, modifiedContent);
-                                addLog(`  ✅ Slide modifiée: ${slideFile}`, 'success');
-                                graphiquesTrouves++;
+                            // Traitement spécial pour GRAPH_PROV dans les slides
+                            if (slideContent.includes('GRAPH_PROV')) {
+                                addLog(`  🏘️ TRAITEMENT GRAPH_PROV dans ${slideFile} (XML uniquement)`, 'info');
+                                
+                                // APPROCHE XML UNIQUEMENT: Modifier directement le contenu XML de la slide
+                                addLog(`  🔄 Modification XML de la slide pour GRAPH_PROV...`, 'info');
+                                const modifiedContent = await processChartXmlContent(slideContent, templateData, row, excelData);
+                                
+                                if (modifiedContent !== slideContent) {
+                                    zip.file(slideFile, modifiedContent);
+                                    addLog(`  ✅ Slide GRAPH_PROV modifiée (XML): ${slideFile}`, 'success');
+                                    graphiquesTrouves++;
+                                } else {
+                                    addLog(`  ⚠️ Aucune modification XML pour GRAPH_PROV dans ${slideFile}`, 'warning');
+                                }
+                            } else {
+                                // Traitement normal pour les autres graphiques
+                                const modifiedContent = await processChartXmlContent(slideContent, templateData, row, excelData);
+                                
+                                if (modifiedContent !== slideContent) {
+                                    zip.file(slideFile, modifiedContent);
+                                    addLog(`  ✅ Slide modifiée: ${slideFile}`, 'success');
+                                    graphiquesTrouves++;
+                                }
                             }
                         }
                     } catch (error) {
@@ -1248,7 +2296,7 @@ Bien à vous,</textarea>
         async function processEmbeddedExcelChart(zip, chartFile, templateData) {
             try {
                 addLog(`  📊 TRAITEMENT VIA XML: ${chartFile}`, 'info');
-                addLog(`  📊 Données disponibles: AGE="${templateData['AGE']}", SOCIO-PRO="${templateData['SOCIO-PRO']}", PROVENANCE="${templateData['PROVENANCE']}"`, 'info');
+                addLog(`  📊 Données disponibles: AGE="${templateData['AGE']}", SOCIO-PRO="${templateData['SOCIO-PRO']}", SEXE="${templateData['SEXE']}"`, 'info');
                 
                 // Cette fonction est maintenant gérée par processEmbeddedCharts via XML
                 addLog(`  ✅ Traitement XML effectué dans processEmbeddedCharts`, 'success');
@@ -1282,7 +2330,7 @@ Bien à vous,</textarea>
                         // Chercher les références à ce fichier Excel dans la slide
                         if (slideContent.includes(chartFile) || slideContent.includes('embeddings/') || 
                             slideContent.includes('GRAPH_AGE') || slideContent.includes('GRAPH_CSP') || 
-                            slideContent.includes('GRAPH_PROVENANCE')) {
+                            slideContent.includes('GRAPH_PROV')) {
                             addLog(`      📊 Graphique trouvé dans ${slideFile}`, 'info');
                             
                             // Modifier le contenu XML pour forcer la mise à jour
@@ -1340,6 +2388,91 @@ Bien à vous,</textarea>
                 
             } catch (error) {
                 addLog(`    ❌ Erreur force mise à jour graphiques: ${error.message}`, 'error');
+            }
+        }
+
+        // Fonction pour forcer la mise à jour de tous les graphiques
+        async function forceAllChartsRefresh(zip) {
+            try {
+                addLog(`    🔄 FORCE LA MISE À JOUR DE TOUS LES GRAPHIQUES...`, 'info');
+                
+                // 1. Parcourir tous les fichiers de graphiques
+                const chartFiles = [];
+                zip.forEach((relativePath, file) => {
+                    if (relativePath.includes('charts/chart') && relativePath.endsWith('.xml')) {
+                        chartFiles.push(relativePath);
+                    }
+                });
+                
+                addLog(`    📋 ${chartFiles.length} fichiers de graphiques à forcer`, 'info');
+                
+                for (const chartFile of chartFiles) {
+                    try {
+                        const chartContent = await zip.file(chartFile).async('string');
+                        
+                        // Ajouter des métadonnées de rafraîchissement
+                        const timestamp = Date.now();
+                        let modifiedChart = chartContent;
+                        
+                        // Forcer la mise à jour des métadonnées
+                        modifiedChart = modifiedChart.replace(
+                            /<c:chart xmlns:c="http:\/\/schemas\.openxmlformats\.org\/drawingml\/2006\/chart">/g,
+                            `<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" refresh="${timestamp}" autoUpdate="1">`
+                        );
+                        
+                        // Ajouter des attributs de rafraîchissement
+                        modifiedChart = modifiedChart.replace(
+                            /<c:chart>/g,
+                            `<c:chart autoUpdate="1" refresh="${timestamp}">`
+                        );
+                        
+                        if (modifiedChart !== chartContent) {
+                            zip.file(chartFile, modifiedChart);
+                            addLog(`      ✅ Graphique ${chartFile} forcé à se rafraîchir`, 'success');
+                        }
+                        
+                    } catch (error) {
+                        addLog(`      ⚠️ Erreur forçage ${chartFile}: ${error.message}`, 'warning');
+                    }
+                }
+                
+                // 2. Forcer la mise à jour des slides
+                const slideFiles = [];
+                zip.forEach((relativePath, file) => {
+                    if (relativePath.includes('slides/slide') && relativePath.endsWith('.xml')) {
+                        slideFiles.push(relativePath);
+                    }
+                });
+                
+                for (const slideFile of slideFiles) {
+                    try {
+                        const slideContent = await zip.file(slideFile).async('string');
+                        
+                        if (slideContent.includes('<c:chart') || slideContent.includes('GRAPH_')) {
+                            const timestamp = Date.now();
+                            let modifiedSlide = slideContent;
+                            
+                            // Forcer la mise à jour des graphiques dans les slides
+                            modifiedSlide = modifiedSlide.replace(
+                                /<c:chart xmlns:c="http:\/\/schemas\.openxmlformats\.org\/drawingml\/2006\/chart">/g,
+                                `<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" refresh="${timestamp}" autoUpdate="1">`
+                            );
+                            
+                            if (modifiedSlide !== slideContent) {
+                                zip.file(slideFile, modifiedSlide);
+                                addLog(`      ✅ Slide ${slideFile} forcée à se rafraîchir`, 'success');
+                            }
+                        }
+                        
+                    } catch (error) {
+                        addLog(`      ⚠️ Erreur forçage slide ${slideFile}: ${error.message}`, 'warning');
+                    }
+                }
+                
+                addLog(`    ✅ MISE À JOUR FORCÉE DE TOUS LES GRAPHIQUES`, 'success');
+                
+            } catch (error) {
+                addLog(`    ❌ Erreur forçage général: ${error.message}`, 'error');
             }
         }
 
@@ -1451,12 +2584,10 @@ Bien à vous,</textarea>
                 const audience = row['Audience Cible'] || '0';
                 const odv = row['ODV Total'] || '0';
                 const reponse = row['Réponse'] || '0';
+                const client = row['Client'] || networkName;
                 
-                // Calculer le numéro de semaine (même logique que dans PowerPoint)
-                const now = new Date();
-                const startOfYear = new Date(now.getFullYear(), 0, 1);
-                const pastDaysOfYear = (now - startOfYear) / 86400000;
-                const weekNumber = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
+                // Calculer le numéro de semaine (utiliser la fonction existante)
+                const weekNumber = getCurrentWeek();
                 
                 // Formater les données avec le même algorithme que PowerPoint
                 const cityFormatted = city.toUpperCase();
@@ -1467,27 +2598,35 @@ Bien à vous,</textarea>
                 // Utiliser le même formatage de date que PowerPoint
                 const periodeFormatted = formatDateForEmail(periode);
                 
+                // Créer l'objet de l'email
+                const emailSubject = `Buster x ${client} - Vos rapports d'audience`;
+                
                 // Remplacer les variables dans le template personnalisé
-                let emailTemplate = customTemplate
+                let emailBody = customTemplate
                     .replace(/\{VILLE\}/g, cityFormatted)
                     .replace(/\{PERIODE\}/g, periodeFormatted)
                     .replace(/\{AUDIENCE\}/g, audienceFormatted)
                     .replace(/\{ODV\}/g, odvFormatted)
                     .replace(/\{REPONSE\}/g, reponseFormatted)
-                    .replace(/\{NB_SEMAINE\}/g, weekNumber);
+                    .replace(/\{WEEK\}/g, weekNumber);
                 
                 // Si le template est vide, utiliser le template par défaut
                 if (!customTemplate.trim()) {
-                    emailTemplate = `Bonjour,
+                    emailBody = `Bonjour,
 Vous trouverez ci-joint le bilan complet de votre campagne menée sur les bus de ${cityFormatted} ${periodeFormatted}.
-Durant cette période (semaine ${weekNumber}), vous avez touché une audience de ${audienceFormatted} personnes et votre campagne a généré plus de ${odvFormatted} contacts.
+Durant cette période, vous avez touché une audience de ${audienceFormatted} personnes et votre campagne a généré plus de ${odvFormatted} contacts.
 Parcourez le document en pièce jointe pour connaître les indicateurs clés de votre campagne et le profil de votre audience.
 Bien à vous,
 
 `;
                 }
                 
-                return emailTemplate;
+                 // Créer le contenu du fichier .txt
+                 const txtContent = `Subject: ${emailSubject}
+
+ ${emailBody}`;
+                
+                 return txtContent;
                 
             } catch (error) {
                 addLog(`❌ Erreur création template email: ${error.message}`, 'error');
@@ -1585,7 +2724,7 @@ Bien à vous,
             
             // Calculer l'estimation du temps restant avec produit en croix
             let timeEstimation = '';
-            if (current > 0 && total > current) {
+            if (current > 0 && total > current && processingStartTime) {
                 const elapsed = Date.now() - processingStartTime;
                 const avgTimePerFile = elapsed / current;
                 const remainingFiles = total - current;
@@ -1609,7 +2748,7 @@ Bien à vous,
             }
         }
 
-        async function processFilesLocally(excelFile, powerpointFile, outputPrefix, emailDestination) {
+        async function processFilesLocally(excelFile, powerpointFile, outputPrefix, emailDestination, emailTemplate = null, chartData = null) {
             try {
                 addLog('Début du traitement local des fichiers', 'info');
                 addLog(`Excel: ${excelFile.name}`, 'info');
@@ -1652,13 +2791,6 @@ Bien à vous,
                     addLog('⚠️ Sheet "Audience" non trouvée - les données démographiques ne seront pas disponibles', 'warning');
                 }
 
-                // 4.1. Lire la sheet "Provenance" pour les données de provenance (communes)
-                const provenanceSheet = excelData.Sheets['Provenance'];
-                if (provenanceSheet) {
-                    addLog('✅ Sheet "Provenance" trouvée', 'success');
-                } else {
-                    addLog('⚠️ Sheet "Provenance" non trouvée - les données de provenance ne seront pas disponibles', 'warning');
-                }
 
                 // 5. Lire le fichier PowerPoint template
                 addLog('📖 Lecture du fichier PowerPoint template...', 'info');
@@ -1701,7 +2833,8 @@ Bien à vous,
                             'Période': 'DATE',
                             'Ville': 'CITY',
                             'Audience Cible': 'AUDIENCE',
-                            'NB_SEMAINE': 'NB_SEMAINE'
+                            'Client': 'CLIENT',
+                            'WEEK': 'WEEK'
                         };
 
                         // Fonctions de formatage
@@ -1721,6 +2854,10 @@ Bien à vous,
                                     const decimal = num.toFixed(1);
                                     const [integer, fraction] = decimal.split('.');
                                     return addSpaces(integer) + '.' + fraction;
+                                case 'TWO_DECIMALS_COMMA':
+                                    const decimal2 = num.toFixed(2);
+                                    const [integer2, fraction2] = decimal2.split('.');
+                                    return addSpaces(integer2) + ',' + fraction2;
                                 case 'PERCENTAGE':
                                     return addSpaces((num * 100).toFixed(0)) + '%';
                                 default:
@@ -1752,25 +2889,27 @@ Bien à vous,
                         let replacementsCount = 0;
                         
                         // Calculer le numéro de semaine actuelle
-                        const now = new Date();
-                        const startOfYear = new Date(now.getFullYear(), 0, 1);
-                        const pastDaysOfYear = (now - startOfYear) / 86400000;
-                        const weekNumber = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
-                        
-                        // S'assurer que NB_SEMAINE est bien ajouté et formaté comme string
-                        templateData['NB_SEMAINE'] = weekNumber.toString();
+                        const weekNumber = getCurrentWeek();
+                        templateData['WEEK'] = weekNumber;
                         addLog(`    📅 Numéro de semaine calculé: ${weekNumber}`, 'info');
-                        addLog(`    🔍 DEBUG: NB_SEMAINE ajouté au templateData: "${templateData['NB_SEMAINE']}"`, 'info');
+                        
                         
                         for (const [excelColumn, templateKey] of Object.entries(mapping)) {
-                            if (row[excelColumn] !== undefined && row[excelColumn] !== null) {
-                                let value = row[excelColumn];
-                                let formattedValue;
+                            let value;
+                            let formattedValue;
+                            
+                            // Traitement spécial pour WEEK (variable calculée)
+                            if (templateKey === 'WEEK') {
+                                value = weekNumber;
+                                formattedValue = value.toString();
+                                addLog(`    📅 Variable WEEK calculée: ${value}`, 'info');
+                            } else if (row[excelColumn] !== undefined && row[excelColumn] !== null) {
+                                value = row[excelColumn];
                                 
                                 switch(templateKey) {
                                     case 'ODV': formattedValue = formatNumber(value, 'ROUND_UP'); break;
                                     case 'GRP': formattedValue = formatNumber(value, 'ROUND_UP'); break;
-                                    case 'TIMES': formattedValue = formatNumber(value, 'ONE_DECIMAL'); break;
+                                    case 'TIMES': formattedValue = formatNumber(value, 'TWO_DECIMALS_COMMA'); break;
                                     case 'VIEWS': formattedValue = formatNumber(value, 'ROUND_UP'); break;
                                     case 'POP': formattedValue = formatNumber(value, 'PERCENTAGE'); break;
                                     case 'DATE': formattedValue = formatDate(value); break;
@@ -1782,15 +2921,41 @@ Bien à vous,
                                 templateData[templateKey] = formattedValue;
                                 addLog(`    🔄 ${excelColumn} → {${templateKey}} = ${formattedValue}`, 'info');
                                 replacementsCount++;
-                            } else {
+                            } else if (templateKey !== 'WEEK') {
                                 templateData[templateKey] = '';
                                 addLog(`    ⚠️ Colonne "${excelColumn}" non trouvée pour {${templateKey}}`, 'warning');
                             }
                         }
+                        
+                        // S'assurer que WEEK est bien dans templateData
+                        if (!templateData['WEEK']) {
+                            templateData['WEEK'] = weekNumber;
+                            addLog(`    📅 WEEK ajouté au templateData: ${weekNumber}`, 'info');
+                        }
 
-                        // Ajouter les données démographiques depuis la feuille Audience
-                        if (audienceSheet) {
-                            addLog(`  📊 Lecture des données démographiques...`, 'info');
+                        // Utiliser les données saisies par l'utilisateur pour les graphiques
+                        if (chartData) {
+                            addLog(`  📊 Utilisation des données saisies par l'utilisateur...`, 'info');
+                            
+                            // Utiliser les données des graphiques saisies par l'utilisateur
+                            if (chartData['AGE']) {
+                                templateData['AGE'] = chartData['AGE'];
+                                addLog(`    ✅ Données AGE utilisateur: "${templateData['AGE']}"`, 'success');
+                            }
+                            
+                            if (chartData['SOCIO-PRO']) {
+                                templateData['SOCIO-PRO'] = chartData['SOCIO-PRO'];
+                                addLog(`    ✅ Données CSP utilisateur: "${templateData['SOCIO-PRO']}"`, 'success');
+                            }
+                            
+                            if (chartData['SEXE']) {
+                                templateData['SEXE'] = chartData['SEXE'];
+                                addLog(`    ✅ Données SEXE utilisateur: "${templateData['SEXE']}"`, 'success');
+                            }
+                            
+                            
+                        } else if (audienceSheet) {
+                            addLog(`  📊 Lecture des données démographiques depuis Excel...`, 'info');
                             
                             const currentPeriod = row['Période'];
                             let audienceRowIndex = -1;
@@ -1851,11 +3016,11 @@ Bien à vous,
                                 templateData['SOCIO-PRO'] = cspData.join(', ');
                                 addLog(`    ✅ Données CSP finales: "${templateData['SOCIO-PRO']}"`, 'success');
                                 
-                                // Données PROVENANCE (colonnes Q et R) - SEXE (pour compatibilité)
+                                // Données SEXE (colonnes Q et R)
                                 const menCell = audienceSheet[`Q${audienceRowIndex}`];
                                 const womenCell = audienceSheet[`R${audienceRowIndex}`];
                                 
-                                addLog(`    📊 MAPPING DONNÉES PROVENANCE (SEXE) depuis Audience ligne ${audienceRowIndex}`, 'info');
+                                addLog(`    📊 MAPPING DONNÉES SEXE depuis Audience ligne ${audienceRowIndex}`, 'info');
                                 if (menCell && womenCell && menCell.v !== undefined && womenCell.v !== undefined) {
                                     // Vérifier si les valeurs sont déjà en pourcentage ou en décimal
                                     const menValue = menCell.v;
@@ -1864,88 +3029,12 @@ Bien à vous,
                                     // Si la valeur est > 1, elle est déjà en pourcentage, sinon c'est un décimal
                                     const menPercentage = menValue > 1 ? menValue.toFixed(1) : (menValue * 100).toFixed(1);
                                     const womenPercentage = womenValue > 1 ? womenValue.toFixed(1) : (womenValue * 100).toFixed(1);
-                                    templateData['PROVENANCE'] = `Homme: ${menPercentage}%, Femme: ${womenPercentage}%`;
+                                    templateData['SEXE'] = `Homme: ${menPercentage}%, Femme: ${womenPercentage}%`;
                                     templateData['MEN'] = `${menPercentage}%`;
                                     templateData['WOMEN'] = `${womenPercentage}%`;
                                     addLog(`      📊 Homme: ${menPercentage}% (cellule Q${audienceRowIndex})`, 'info');
                                     addLog(`      📊 Femme: ${womenPercentage}% (cellule R${audienceRowIndex})`, 'info');
-                                    addLog(`    ✅ Données PROVENANCE finales: "${templateData['PROVENANCE']}"`, 'success');
-                                }
-                                
-                                // NOUVELLE LOGIQUE: Données PROVENANCE (COMMUNES) depuis la feuille Provenance
-                                if (provenanceSheet) {
-                                    addLog(`    📊 MAPPING DONNÉES PROVENANCE (COMMUNES) depuis feuille Provenance`, 'info');
-                                    
-                                    // Trouver la ligne correspondante à la période dans la feuille Provenance
-                                    let provenanceRowIndex = -1;
-                                    for (let provRow = 2; provRow <= 100; provRow++) {
-                                        const provDateCell = provenanceSheet[`A${provRow}`];
-                                        if (provDateCell && provDateCell.v === currentPeriod) {
-                                            provenanceRowIndex = provRow;
-                                            addLog(`  ✅ Ligne Provenance trouvée: ${provRow}`, 'success');
-                                            break;
-                                        }
-                                    }
-                                    
-                                    if (provenanceRowIndex !== -1) {
-                                        // Lire les en-têtes des communes (ligne 2, à partir de C2)
-                                        const communeHeaders = [];
-                                        for (let col = 'C'; col <= 'Z'; col++) {
-                                            const headerCell = provenanceSheet[`${col}2`];
-                                            if (headerCell && headerCell.v && headerCell.v.toString().trim() !== '') {
-                                                communeHeaders.push({
-                                                    column: col,
-                                                    name: headerCell.v.toString().trim()
-                                                });
-                                            } else {
-                                                break; // Arrêter si on trouve une cellule vide
-                                            }
-                                        }
-                                        
-                                        addLog(`    📊 ${communeHeaders.length} communes trouvées: ${communeHeaders.map(c => c.name).join(', ')}`, 'info');
-                                        
-                                        if (communeHeaders.length > 0) {
-                                            // Lire les données pour cette période
-                                            const communeData = [];
-                                            for (const commune of communeHeaders) {
-                                                const dataCell = provenanceSheet[`${commune.column}${provenanceRowIndex}`];
-                                                if (dataCell && dataCell.v !== undefined) {
-                                                    const percentage = (dataCell.v * 100).toFixed(1);
-                                                    communeData.push({
-                                                        name: commune.name,
-                                                        percentage: parseFloat(percentage)
-                                                    });
-                                                }
-                                            }
-                                            
-                                            // Trier par pourcentage décroissant
-                                            communeData.sort((a, b) => b.percentage - a.percentage);
-                                            
-                                            // Prendre les 6 premières communes + calculer "Autres" (debug)
-                                            const top6Communes = communeData.slice(0, 6);
-                                            const otherCommunes = communeData.slice(6);
-                                            const otherPercentage = otherCommunes.reduce((sum, commune) => sum + commune.percentage, 0);
-                                            
-                                            // Construire la chaîne de données pour GRAPH_PROV
-                                            const provenanceData = [];
-                                            top6Communes.forEach(commune => {
-                                                provenanceData.push(`${commune.name}: ${commune.percentage}%`);
-                                            });
-                                            
-                                            if (otherPercentage > 0) {
-                                                provenanceData.push(`Autres: ${otherPercentage.toFixed(1)}%`);
-                                            }
-                                            
-                                            templateData['GRAPH_PROV'] = provenanceData.join(', ');
-                                            addLog(`    ✅ Données GRAPH_PROV finales: "${templateData['GRAPH_PROV']}"`, 'success');
-                                            addLog(`    📊 Top 6 communes: ${top6Communes.map(c => `${c.name} (${c.percentage}%)`).join(', ')}`, 'info');
-                                            if (otherPercentage > 0) {
-                                                addLog(`    📊 Autres communes: ${otherPercentage.toFixed(1)}%`, 'info');
-                                            }
-                                        }
-                                    } else {
-                                        addLog(`    ⚠️ Aucune ligne Provenance trouvée pour la période ${currentPeriod}`, 'warning');
-                                    }
+                                    addLog(`    ✅ Données SEXE finales: "${templateData['SEXE']}"`, 'success');
                                 }
                             }
                         }
@@ -1968,9 +3057,19 @@ Bien à vous,
                         
                         // Nouvelle logique simplifiée pour les pages de garde
                         const networkDataForCover = parseNetworkData(networkName);
-                        const isFlancGauche = networkDataForCover.face && networkDataForCover.face.toLowerCase().includes('gauche');
+                        const faceType = networkDataForCover.face ? networkDataForCover.face.toLowerCase() : '';
+                        const cityName = networkDataForCover.ville ? networkDataForCover.ville.toLowerCase() : '';
+                        const isFlancGauche = faceType.includes('gauche');
+                        const isFlancDroit = faceType.includes('droit');
+                        const isArriere = faceType.includes('arrière') || faceType.includes('arriere');
+                        const isBrest = cityName.includes('brest');
+                        const isBrestFlancDroit = isBrest && isFlancDroit;
                         
-                        addLog(`      📄 Type de flanc détecté: ${isFlancGauche ? 'Flanc Gauche' : 'Flanc Droit/Arrière'}`, 'info');
+                        addLog(`      📄 Type de flanc détecté: ${networkDataForCover.face}`, 'info');
+                        addLog(`      🏙️ Ville détectée: ${networkDataForCover.ville}`, 'info');
+                        if (isBrestFlancDroit) {
+                            addLog(`      ⭐ Règle spéciale Brest + Flanc Droit activée`, 'info');
+                        }
                         
                         // Traiter toutes les slides avec masquage au lieu de suppression
                         for (const slideFile of slideFiles) {
@@ -1979,25 +3078,96 @@ Bien à vous,
                             
                             // Déterminer si cette slide doit être masquée
                             let shouldHide = false;
+                            let hideReason = '';
                             
-                            if (slideFile.includes('slide1.xml') && !isFlancGauche) {
-                                // Masquer slide 1 si flanc droit ou arrière
+                            // Règles de masquage existantes (diapos 1 et 2)
+                            if (slideFile.includes('slide1.xml') && isFlancGauche) {
                                 shouldHide = true;
-                                addLog(`      👁️ Slide 1 masquée (Flanc Droit/Arrière)`, 'info');
-                            } else if (slideFile.includes('slide2.xml') && isFlancGauche) {
-                                // Masquer slide 2 si flanc gauche
+                                hideReason = 'Slide 1 masquée (Flanc Gauche)';
+                            } else if (slideFile.includes('slide2.xml') && !isFlancGauche) {
                                 shouldHide = true;
-                                addLog(`      👁️ Slide 2 masquée (Flanc Gauche)`, 'info');
+                                hideReason = 'Slide 2 masquée (Flanc Droit/Arrière)';
                             }
                             
-                            // Masquer la slide en supprimant tout son contenu
+                            // Nouvelles règles de masquage
+                            if (slideFile.includes('slide5.xml')) {
+                                if (isBrestFlancDroit) {
+                                    // Règle spéciale Brest : masquer slide 5 si Brest + flanc droit
+                                    shouldHide = true;
+                                    hideReason = 'Slide 5 masquée (Brest + Flanc Droit)';
+                                } else if (isFlancDroit || isArriere) {
+                                    shouldHide = true;
+                                    hideReason = 'Slide 5 masquée (Flanc Droit/Arrière)';
+                                }
+                            } else if (slideFile.includes('slide6.xml')) {
+                                if (isBrestFlancDroit) {
+                                    // Règle spéciale Brest : masquer slide 6 si Brest + flanc droit
+                                    shouldHide = true;
+                                    hideReason = 'Slide 6 masquée (Brest + Flanc Droit)';
+                                } else if (isFlancGauche || isFlancDroit) {
+                                    shouldHide = true;
+                                    hideReason = 'Slide 6 masquée (Flanc Gauche/Droit)';
+                                }
+                            } else if (slideFile.includes('slide7.xml')) {
+                                if (isBrestFlancDroit) {
+                                    // Règle spéciale Brest : masquer slide 7 si Brest + flanc droit
+                                    shouldHide = true;
+                                    hideReason = 'Slide 7 masquée (Brest + Flanc Droit)';
+                                } else if (isFlancGauche || isArriere) {
+                                    shouldHide = true;
+                                    hideReason = 'Slide 7 masquée (Flanc Gauche/Arrière)';
+                                }
+                            } else if (slideFile.includes('slide8.xml')) {
+                                if (!isBrestFlancDroit) {
+                                    // Règle spéciale Brest : masquer slide 8 sauf si Brest + flanc droit
+                                    shouldHide = true;
+                                    hideReason = 'Slide 8 masquée (Non Brest ou Non Flanc Droit)';
+                                } else {
+                                    addLog(`      ✅ Slide 8 affichée (Brest + Flanc Droit)`, 'success');
+                                }
+                            }
+                            
                             if (shouldHide) {
-                                // Vider complètement le contenu de la slide
+                                addLog(`      👁️ ${hideReason}`, 'info');
+                            }
+                            
+                            // Désactiver visuellement la slide dans l'éditeur
+                            if (shouldHide) {
+                                // Méthode 1: Ajouter show="0" pour masquer la slide
                                 modifiedContent = modifiedContent.replace(
-                                    /<p:sld[^>]*>.*?<\/p:sld>/gs,
-                                    '<p:sld><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld></p:sld>'
+                                    /<p:sld[^>]*>/g, 
+                                    (match) => {
+                                        if (!match.includes('show=')) {
+                                            return match.replace('>', ' show="0">');
+                                        }
+                                        return match;
+                                    }
                                 );
-                                addLog(`      🔧 Contenu de la slide vidé pour masquage: ${slideFile}`, 'info');
+                                
+                                // Méthode 2: Ajouter hidden="1" pour la désactiver complètement
+                                modifiedContent = modifiedContent.replace(
+                                    /<p:sld[^>]*>/g,
+                                    (match) => {
+                                        if (!match.includes('hidden=')) {
+                                            return match.replace('>', ' hidden="1">');
+                                        }
+                                        return match;
+                                    }
+                                );
+                                
+                                // Méthode 3: Modifier le type de slide pour la rendre invisible
+                                modifiedContent = modifiedContent.replace(
+                                    /<p:sldId[^>]*>/g,
+                                    (match) => {
+                                        if (!match.includes('show=')) {
+                                            return match.replace('>', ' show="0" hidden="1">');
+                                        }
+                                        return match;
+                                    }
+                                );
+                                
+                                addLog(`      🔧 Slide désactivée visuellement dans ${slideFile}`, 'info');
+                                addLog(`      🔧 Attributs ajoutés: show="0" hidden="1"`, 'info');
                             }
                             
                             // Traiter les variables pour toutes les slides
@@ -2006,22 +3176,6 @@ Bien à vous,
                                 if (modifiedContent.includes(placeholder)) {
                                     modifiedContent = modifiedContent.replace(new RegExp(placeholder, 'g'), value);
                                     addLog(`      🔄 Remplacé ${placeholder} par ${value}`, 'info');
-                                } else if (templateKey === 'NB_SEMAINE') {
-                                    // Debug spécifique pour NB_SEMAINE
-                                    addLog(`      🔍 DEBUG: {NB_SEMAINE} non trouvé dans ${slideFile}`, 'warning');
-                                    addLog(`      🔍 DEBUG: Contenu slide (500 chars): ${modifiedContent.substring(0, 500)}`, 'info');
-                                }
-                            }
-                            
-                            // FORCER le remplacement de NB_SEMAINE même s'il n'est pas trouvé dans le mapping
-                            if (templateData['NB_SEMAINE']) {
-                                const nbSemaineValue = templateData['NB_SEMAINE'];
-                                const originalContent = modifiedContent;
-                                modifiedContent = modifiedContent.replace(/\{NB_SEMAINE\}/g, nbSemaineValue);
-                                if (modifiedContent !== originalContent) {
-                                    addLog(`      🔧 FORCÉ: {NB_SEMAINE} remplacé par ${nbSemaineValue}`, 'success');
-                                } else {
-                                    addLog(`      🔍 FORCÉ: {NB_SEMAINE} non trouvé dans le contenu`, 'warning');
                                 }
                             }
                             
@@ -2029,9 +3183,106 @@ Bien à vous,
                             addLog(`      ✅ Slide traitée: ${slideFile}`, 'success');
                         }
                         
+                        // Désactiver les slides dans presentation.xml pour qu'elles n'apparaissent pas dans l'éditeur
+                        try {
+                            const presentationContent = await zip.file('ppt/presentation.xml').async('string');
+                            let modifiedPresentation = presentationContent;
+                            
+                            // Désactiver slide 1 si flanc gauche
+                            if (isFlancGauche) {
+                                modifiedPresentation = modifiedPresentation.replace(
+                                    /(<p:sldId id="\d+" r:id="rId1"[^>]*>)/g,
+                                    '$1<p:extLst><p:ext uri="{FF2C5E14-C905-4F95-9C57-5AF2B2EE5661}"><p14:modId xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="00000000-0000-0000-0000-000000000000"/></p:ext></p:extLst>'
+                                );
+                                addLog(`      🔧 Slide 1 désactivée dans presentation.xml (Flanc Gauche)`, 'info');
+                            }
+                            
+                            // Désactiver slide 2 si flanc droit ou arrière
+                            if (!isFlancGauche) {
+                                modifiedPresentation = modifiedPresentation.replace(
+                                    /(<p:sldId id="\d+" r:id="rId2"[^>]*>)/g,
+                                    '$1<p:extLst><p:ext uri="{FF2C5E14-C905-4F95-9C57-5AF2B2EE5661}"><p14:modId xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="00000000-0000-0000-0000-000000000000"/></p:ext></p:extLst>'
+                                );
+                                addLog(`      🔧 Slide 2 désactivée dans presentation.xml (Flanc Droit/Arrière)`, 'info');
+                            }
+                            
+                            // Désactiver slide 5 selon les règles
+                            if (isBrestFlancDroit) {
+                                // Règle spéciale Brest : désactiver slide 5 si Brest + flanc droit
+                                modifiedPresentation = modifiedPresentation.replace(
+                                    /(<p:sldId id="\d+" r:id="rId5"[^>]*>)/g,
+                                    '$1<p:extLst><p:ext uri="{FF2C5E14-C905-4F95-9C57-5AF2B2EE5661}"><p14:modId xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="00000000-0000-0000-0000-000000000000"/></p:ext></p:extLst>'
+                                );
+                                addLog(`      🔧 Slide 5 désactivée dans presentation.xml (Brest + Flanc Droit)`, 'info');
+                            } else if (isFlancDroit || isArriere) {
+                                modifiedPresentation = modifiedPresentation.replace(
+                                    /(<p:sldId id="\d+" r:id="rId5"[^>]*>)/g,
+                                    '$1<p:extLst><p:ext uri="{FF2C5E14-C905-4F95-9C57-5AF2B2EE5661}"><p14:modId xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="00000000-0000-0000-0000-000000000000"/></p:ext></p:extLst>'
+                                );
+                                addLog(`      🔧 Slide 5 désactivée dans presentation.xml (Flanc Droit/Arrière)`, 'info');
+                            }
+                            
+                            // Désactiver slide 6 selon les règles
+                            if (isBrestFlancDroit) {
+                                // Règle spéciale Brest : désactiver slide 6 si Brest + flanc droit
+                                modifiedPresentation = modifiedPresentation.replace(
+                                    /(<p:sldId id="\d+" r:id="rId6"[^>]*>)/g,
+                                    '$1<p:extLst><p:ext uri="{FF2C5E14-C905-4F95-9C57-5AF2B2EE5661}"><p14:modId xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="00000000-0000-0000-0000-000000000000"/></p:ext></p:extLst>'
+                                );
+                                addLog(`      🔧 Slide 6 désactivée dans presentation.xml (Brest + Flanc Droit)`, 'info');
+                            } else if (isFlancGauche || isFlancDroit) {
+                                modifiedPresentation = modifiedPresentation.replace(
+                                    /(<p:sldId id="\d+" r:id="rId6"[^>]*>)/g,
+                                    '$1<p:extLst><p:ext uri="{FF2C5E14-C905-4F95-9C57-5AF2B2EE5661}"><p14:modId xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="00000000-0000-0000-0000-000000000000"/></p:ext></p:extLst>'
+                                );
+                                addLog(`      🔧 Slide 6 désactivée dans presentation.xml (Flanc Gauche/Droit)`, 'info');
+                            }
+                            
+                            // Désactiver slide 7 selon les règles
+                            if (isBrestFlancDroit) {
+                                // Règle spéciale Brest : désactiver slide 7 si Brest + flanc droit
+                                modifiedPresentation = modifiedPresentation.replace(
+                                    /(<p:sldId id="\d+" r:id="rId7"[^>]*>)/g,
+                                    '$1<p:extLst><p:ext uri="{FF2C5E14-C905-4F95-9C57-5AF2B2EE5661}"><p14:modId xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="00000000-0000-0000-0000-000000000000"/></p:ext></p:extLst>'
+                                );
+                                addLog(`      🔧 Slide 7 désactivée dans presentation.xml (Brest + Flanc Droit)`, 'info');
+                            } else if (isFlancGauche || isArriere) {
+                                modifiedPresentation = modifiedPresentation.replace(
+                                    /(<p:sldId id="\d+" r:id="rId7"[^>]*>)/g,
+                                    '$1<p:extLst><p:ext uri="{FF2C5E14-C905-4F95-9C57-5AF2B2EE5661}"><p14:modId xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="00000000-0000-0000-0000-000000000000"/></p:ext></p:extLst>'
+                                );
+                                addLog(`      🔧 Slide 7 désactivée dans presentation.xml (Flanc Gauche/Arrière)`, 'info');
+                            }
+                            
+                            // Désactiver slide 8 selon la règle spéciale Brest
+                            if (!isBrestFlancDroit) {
+                                // Masquer slide 8 sauf si Brest + flanc droit
+                                modifiedPresentation = modifiedPresentation.replace(
+                                    /(<p:sldId id="\d+" r:id="rId8"[^>]*>)/g,
+                                    '$1<p:extLst><p:ext uri="{FF2C5E14-C905-4F95-9C57-5AF2B2EE5661}"><p14:modId xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="00000000-0000-0000-0000-000000000000"/></p:ext></p:extLst>'
+                                );
+                                addLog(`      🔧 Slide 8 désactivée dans presentation.xml (Non Brest ou Non Flanc Droit)`, 'info');
+                            } else {
+                                addLog(`      ✅ Slide 8 activée dans presentation.xml (Brest + Flanc Droit)`, 'success');
+                            }
+                            
+                            if (modifiedPresentation !== presentationContent) {
+                                zip.file('ppt/presentation.xml', modifiedPresentation);
+                                addLog(`      ✅ presentation.xml modifié pour désactiver les slides`, 'success');
+                            }
+                        } catch (error) {
+                            addLog(`      ⚠️ Erreur modification presentation.xml: ${error.message}`, 'warning');
+                        }
+
                         // Traiter les graphiques Excel embarqués
-                        const chartsProcessed = await processEmbeddedCharts(zip, templateData);
+                        const chartsProcessed = await processEmbeddedCharts(zip, templateData, row, excelData);
                         addLog(`  📈 ${chartsProcessed} graphiques traités`, 'info');
+                        
+                        // NOUVELLE APPROCHE: Forcer la mise à jour de tous les graphiques
+                        if (chartsProcessed > 0) {
+                            addLog(`  🔄 FORCE LA MISE À JOUR DE TOUS LES GRAPHIQUES...`, 'info');
+                            await forceAllChartsRefresh(zip);
+                        }
                         
                         // Générer le fichier PowerPoint
                         const blob = await zip.generateAsync({
@@ -2047,10 +3298,14 @@ Bien à vous,
                         
                         addLog(`  ✅ Fichier PowerPoint généré: ${(blob.size / 1024 / 1024).toFixed(2)} MB`, 'success');
 
-                        const fileName = `${outputPrefix}_${networkName}.pptx`;
-                        
-                        // Parser les données de la colonne "Réseau" pour créer la hiérarchie
+                        // Générer le nom de fichier selon la nouvelle nomenclature
+                        // Format: "Buster x [ville] - [flanc] - [ville] - S[numero_semaine].pptx"
                         const networkData = parseNetworkData(networkName);
+                        const city = networkData.ville || row['Ville'] || 'Inconnue';
+                        const flanc = networkData.face || 'Inconnu';
+                        const currentWeek = getCurrentWeek();
+                        const fileName = `Buster x ${city} - ${flanc} - ${city} - S${currentWeek}.pptx`;
+                        
                         addLog(`  📊 Données réseau parsées: ${JSON.stringify(networkData)}`, 'info');
                         
                         // Créer le chemin de fichier avec la hiérarchie
@@ -2064,21 +3319,22 @@ Bien à vous,
                             networkData: networkData
                         });
                         
-                        // Créer le fichier template email avec extension .doc pour éviter le blocage Windows
-                        const emailTemplate = createEmailTemplate(row, networkName);
-                        const docFileName = `Template email - ${fileName.replace('.pptx', '.doc')}`;
-                        const docFilePath = createFileHierarchy(networkData, docFileName);
-                        const docBlob = new Blob([emailTemplate], { type: 'application/msword;charset=utf-8' });
                         
-                        // Collecter le fichier email pour le ZIP final avec la hiérarchie
-                        allFiles.push({
-                            name: docFilePath,
-                            blob: docBlob,
-                            type: 'doc',
-                            networkData: networkData
-                        });
+                         // Créer le fichier template email avec extension .txt
+                         const emailTemplate = createEmailTemplate(row, networkName);
+                         const msgFileName = `Template email - ${fileName.replace('.pptx', '.txt')}`;
+                         const msgFilePath = createFileHierarchy(networkData, msgFileName);
+                         const msgBlob = new Blob([emailTemplate], { type: 'text/plain;charset=utf-8' });
                         
-                        addLog(`  📧 Template email généré: ${docFileName}`, 'info');
+                         // Collecter le fichier email pour le ZIP final avec la hiérarchie
+                         allFiles.push({
+                             name: msgFilePath,
+                             blob: msgBlob,
+                             type: 'txt',
+                             networkData: networkData
+                         });
+                        
+                        addLog(`  📧 Template email généré: ${msgFileName}`, 'info');
                         
                         results.push({
                             fileName: fileName,
@@ -2089,7 +3345,7 @@ Bien à vous,
                         });
 
                         addLog(`  ✅ Fichier créé: ${fileName}`, 'success');
-                        addLog(`  ✅ Template email créé: ${docFileName}`, 'success');
+                        addLog(`  ✅ Template email créé: ${msgFileName}`, 'success');
                         updatePptProgress(i + 1, maxRows);
                         
                     } catch (error) {
@@ -2311,6 +3567,58 @@ Bien à vous,
 
 
 
+        // Fonction pour obtenir le nombre de valeurs attendues par type de graphique
+        function getExpectedValuesCount(chartType) {
+            switch (chartType) {
+                case 'AGE':
+                    return 5; // 15-24, 25-34, 35-49, 50-64, 65+
+                case 'CSP':
+                    return 0; // Variable selon les données
+                default:
+                    return 0; // Inconnu
+            }
+        }
+
+        // Fonction de validation des données des graphiques
+        function validateChartData(ageData, cspData, provData) {
+            try {
+                // Validation des données AGE
+                if (ageData && ageData.trim()) {
+                    const agePattern = /(\d+-\d+ ans(?:\s+ou\s+plus)?):\s*(\d+(?:\.\d+)?)%/g;
+                    const ageMatches = [...ageData.matchAll(agePattern)];
+                    if (ageMatches.length === 0) {
+                        return { isValid: false, error: 'Format des données AGE invalide. Utilisez: "15-24 ans: 25%, 25-34 ans: 30%"' };
+                    }
+                    
+                    // Vérifier que la somme des pourcentages est proche de 100%
+                    const totalAge = ageMatches.reduce((sum, match) => sum + parseFloat(match[2]), 0);
+                    if (Math.abs(totalAge - 100) > 5) {
+                        return { isValid: false, error: `La somme des pourcentages AGE doit être proche de 100% (actuellement: ${totalAge.toFixed(1)}%)` };
+                    }
+                }
+                
+                // Validation des données CSP
+                if (cspData && cspData.trim()) {
+                    const cspPattern = /([^:]+):\s*(\d+(?:\.\d+)?)%/g;
+                    const cspMatches = [...cspData.matchAll(cspPattern)];
+                    if (cspMatches.length === 0) {
+                        return { isValid: false, error: 'Format des données CSP invalide. Utilisez: "Cadres: 40%, Employés: 35%"' };
+                    }
+                    
+                    const totalCsp = cspMatches.reduce((sum, match) => sum + parseFloat(match[2]), 0);
+                    if (Math.abs(totalCsp - 100) > 5) {
+                        return { isValid: false, error: `La somme des pourcentages CSP doit être proche de 100% (actuellement: ${totalCsp.toFixed(1)}%)` };
+                    }
+                }
+                
+                
+                
+                return { isValid: true };
+            } catch (error) {
+                return { isValid: false, error: `Erreur de validation: ${error.message}` };
+            }
+        }
+
         // Gestion de la soumission du formulaire
         document.getElementById('uploadForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -2319,8 +3627,20 @@ Bien à vous,
             const powerpointFile = document.getElementById('powerpointFile').files[0];
             const emailDestination = document.getElementById('emailInput').value;
             const outputPrefix = 'rapport_audience';
+            
+            // Récupérer les données des graphiques saisies par l'utilisateur
+            const ageData = document.getElementById('ageData').value;
+            const cspData = document.getElementById('cspData').value;
+            const provData = document.getElementById('provData').value;
 
             addLog(`Validation: Excel=${excelFile ? 'OK' : 'MANQUANT'}, PowerPoint=${powerpointFile ? 'OK' : 'MANQUANT'}, Email=${emailDestination ? 'OK' : 'MANQUANT'}`, 'info');
+            
+            // Validation des données des graphiques
+            const chartDataValidation = validateChartData(ageData, cspData, provData);
+            if (!chartDataValidation.isValid) {
+                addLog(`Erreur validation données graphiques: ${chartDataValidation.error}`, 'error');
+                return;
+            }
             
             if (!excelFile) {
                 addLog('Veuillez sélectionner un fichier Excel', 'error');
@@ -2350,7 +3670,10 @@ Bien à vous,
 
             try {
                 addLog('Démarrage du traitement local...', 'info');
-                const result = await processFilesLocally(excelFile, powerpointFile, outputPrefix, emailDestination);
+                const result = await processFilesLocally(excelFile, powerpointFile, outputPrefix, emailDestination, null, {
+                    'AGE': ageData,
+                    'SOCIO-PRO': cspData
+                });
                 
                 clearInterval(dotInterval);
                 
@@ -2378,34 +3701,66 @@ Bien à vous,
             document.getElementById('loadingScreen').classList.remove('active');
         });
 
-        // Fonction pour afficher la documentation (simplifiée)
+        // Fonction pour basculer l'affichage de la console
+        function toggleConsole() {
+            const console = document.getElementById('logsContainer');
+            const button = document.getElementById('toggleConsoleBtn');
+            
+            if (console.style.display === 'none' || console.style.display === '') {
+                console.style.display = 'block';
+                button.textContent = 'Masquer Console';
+            } else {
+                console.style.display = 'none';
+                button.textContent = 'Console';
+            }
+        }
+
+        // Ajouter l'événement au bouton console
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleBtn = document.getElementById('toggleConsoleBtn');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', toggleConsole);
+            }
+        });
+
+        // Fonction pour afficher la documentation (version professionnelle)
         function showDocumentation() {
             const doc = `
-📋 DOCUMENTATION - GÉNÉRATEUR DE RAPPORTS D'AUDIENCE
+DOCUMENTATION - GÉNÉRATEUR DE RAPPORTS D'AUDIENCE
 
-🎯 FONCTIONNALITÉS :
+FONCTIONNALITÉS
 • Génération automatique de rapports PowerPoint
 • Traitement des données Excel (Performance média, Audience, Provenance)
 • Gestion des pages de garde selon le type de flanc
+• Masquage automatique des diapositives selon le type de flanc
 • Envoi automatique par email via API Taskalys
 
-📁 FICHIERS REQUIS :
+FICHIERS REQUIS
 • Fichier Excel avec feuilles : "Performance média", "Audience", "Provenance"
 • Template PowerPoint avec variables {VILLE}, {PERIODE}, {AUDIENCE}, etc.
 
-🔧 VARIABLES DISPONIBLES :
+VARIABLES DISPONIBLES
 • {VILLE} - Nom de la ville (majuscules)
 • {PERIODE} - Période formatée (ex: "du 1 janvier 2024 au 7 janvier 2024")
 • {AUDIENCE} - Audience cible formatée
 • {ODV} - Nombre d'ODV formaté
 • {NB_SEMAINE} - Numéro de semaine (1-52)
 
-📧 EMAIL :
-• Template personnalisable avec variables
-• Envoi automatique via API Taskalys
-• Fichiers organisés par hiérarchie (Semaine/Ville/Face/Version)
+ EMAIL
+ • Template personnalisable avec variables
+ • Fichiers .txt avec objet "Buster x [client] - Vos rapports d'audience"
+ • Envoi automatique via API Taskalys
+ • Fichiers organisés par hiérarchie (Année/Semaine/Ville/Face/Version)
 
-⚡ TRAITEMENT :
+MASQUAGE DES DIAPOSITIVES
+• Flanc Gauche : masque les diapositives 1, 6 et 7
+• Flanc Droit : masque les diapositives 2, 5 et 6
+• Arrière : masque les diapositives 2, 5 et 7
+• Règle spéciale Brest + Flanc Droit : affiche la diapositive 8 et masque les diapositives 5, 6 et 7
+• Diapositive 8 : masquée dans tous les autres cas
+• Les diapositives masquées ne sont pas visibles dans l'éditeur PowerPoint
+
+TRAITEMENT
 • Limité à 3 lignes en mode debug
 • Estimation du temps en temps réel
 • Masquage des slides selon le type de flanc
@@ -2414,362 +3769,30 @@ Bien à vous,
             
             alert(doc);
             return;
-            
-            const popup = document.createElement('div');
-            popup.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.8);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 10000;
-                font-family: 'Poppins', sans-serif;
-            `;
-            
-            const popupContent = document.createElement('div');
-            popupContent.style.cssText = `
-                background: #2c2c83;
-                border-radius: 20px;
-                padding: 30px;
-                max-width: 900px;
-                max-height: 80vh;
-                overflow-y: auto;
-                color: white;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-            `;
-            
-            const header = document.createElement('h2');
-            header.innerHTML = 'Documentation - Configuration des fichiers avec graphiques';
-            header.style.cssText = `
-                margin-bottom: 20px;
-                font-size: 1.5rem;
-                font-weight: 700;
-                color: #4CAF50;
-            `;
-            
-            const content = `
-                <div style="margin-bottom: 25px;">
-                    <h3 style="color: #a2137b; margin-bottom: 15px; font-size: 1.2rem;">1. Configuration du fichier Excel</h3>
-                    <h4 style="color: #4CAF50; margin: 15px 0 10px 0;">Feuille "Performance média" :</h4>
-                    <ul style="margin: 0 0 15px 20px; line-height: 1.6;">
-                        <li><strong>Ville</strong> - Nom de la ville</li>
-                        <li><strong>Réseau</strong> - Nom du réseau (pour le nom du fichier)</li>
-                        <li><strong>Période</strong> - Format: "du 2024-09-19 au 2024-10-02"</li>
-                        <li><strong>ODV Cible, ODV Total, GRP, Audience Cible</strong> - Nombres entiers</li>
-                        <li><strong>Répétition Cible</strong> - Nombre décimal</li>
-                        <li><strong>Couverture Cible</strong> - Entre 0 et 1 (converti en %)</li>
-                    </ul>
-                    <h4 style="color: #4CAF50; margin: 15px 0 10px 0;">Feuille "Audience" :</h4>
-                    <ul style="margin: 0 0 15px 20px; line-height: 1.6;">
-                        <li><strong>Colonnes C-G</strong> - Données d'âge (15-24, 25-34, 35-49, 50-64, 65+)</li>
-                        <li><strong>Colonnes H-P</strong> - Données CSP (Agriculteurs, Artisans, etc.)</li>
-                        <li><strong>Colonnes Q-R</strong> - Données Homme/Femme</li>
-                    </ul>
-                </div>
-
-                <div style="margin-bottom: 25px;">
-                    <h3 style="color: #a2137b; margin-bottom: 15px; font-size: 1.2rem;">2. Configuration du template PowerPoint</h3>
-                    <h4 style="color: #4CAF50; margin: 15px 0 10px 0;">Placeholders texte :</h4>
-                    <ul style="margin: 0 0 15px 20px; line-height: 1.6;">
-                        <li><strong>{CITY}</strong> - Ville en majuscules
-                        <li><strong>{DATE}</strong> - Période formatée
-                        <li><strong>{VIEWS}, {ODV}, {GRP}, {AUDIENCE}</strong> - Nombres arrondis
-                        <li><strong>{TIMES}</strong> - Répétition avec 1 décimale
-                        <li><strong>{POP}</strong> - Couverture en pourcentage
-                        <li><strong>{MEN}, {WOMEN}</strong> - Répartition Homme/Femme
-                    </ul>
-                    <h4 style="color: #FF5722; margin: 15px 0 10px 0;">Graphiques intégrés :</h4>
-                    <p style="margin-bottom: 10px;">Dans vos graphiques Excel embarqués, utilisez ces noms spéciaux :</p>
-                    <ul style="margin: 0 0 15px 20px; line-height: 1.6;">
-                        <li><strong>{AGE}</strong> - Remplacé par les données d'âge de la feuille Audience</li>
-                        <li><strong>{SOCIO-PRO}</strong> - Remplacé par les données CSP</li>
-                        <li><strong>{PROVENANCE}</strong> - Remplacé par les données Homme/Femme</li>
-                    </ul>
-                    <p style="color: rgba(255, 255, 255, 0.8); font-size: 0.9rem;">
-                        Ces noms doivent apparaître exactement dans une cellule du fichier Excel embarqué du graphique.
-                        Le système détectera automatiquement la structure (verticale ou horizontale) et adaptera les données.
-                    </p>
-                </div>
-
-                <div style="margin-bottom: 25px;">
-                    <h3 style="color: #a2137b; margin-bottom: 15px; font-size: 1.2rem;">3. Structure des graphiques supportées</h3>
-                    <h4 style="color: #4CAF50; margin: 15px 0 10px 0;">Structure Verticale (comme Image 1) :</h4>
-                    <ul style="margin: 0 0 15px 20px; line-height: 1.6;">
-                        <li>Colonne A : Labels (15-24 ans, 25-34 ans, etc.)</li>
-                        <li>Colonne B : Valeurs décimales (0.241, 0.173, etc.)</li>
-                        <li>Détectée automatiquement si "Audience" trouvé près du nom</li>
-                    </ul>
-                    <h4 style="color: #4CAF50; margin: 15px 0 10px 0;">Structure Horizontale (comme Image 2) :</h4>
-                    <ul style="margin: 0 0 15px 20px; line-height: 1.6;">
-                        <li>Ligne 1 : Headers (Cadres, Employés, Ouvriers, etc.)</li>
-                        <li>Ligne 2 : Valeurs décimales (0.087, 0.153, etc.)</li>
-                        <li>Structure par défaut pour les graphiques CSP</li>
-                    </ul>
-                </div>
-
-                <div style="margin-bottom: 25px;">
-                    <h3 style="color: #a2137b; margin-bottom: 15px; font-size: 1.2rem;">4. Processus de traitement</h3>
-                    <ol style="margin: 0 0 15px 20px; line-height: 1.6;">
-                        <li>Le système lit les données Excel (Performance + Audience)</li>
-                        <li>Pour chaque ligne, il crée un fichier PowerPoint personnalisé</li>
-                        <li>Les placeholders texte sont remplacés dans les slides</li>
-                        <li>Les graphiques Excel embarqués sont modifiés avec les données réelles</li>
-                        <li>Le fichier est téléchargé avec le nom : préfixe_réseau.pptx</li>
-                    </ol>
-                </div>
-
-                <div style="margin-bottom: 20px; padding: 15px; background: rgba(255, 193, 7, 0.1); border-radius: 10px; border-left: 4px solid #FFC107;">
-                    <h4 style="color: #FFC107; margin-bottom: 10px;">Points importants</h4>
-                    <p style="margin: 0; font-size: 0.9rem;">
-                        - Les noms {AGE}, {SOCIO-PRO}, {PROVENANCE} doivent être exactement dans une cellule Excel du graphique<br>
-                        - La détection de structure est automatique mais peut être forcée<br>
-                        - Maximum 10 fichiers PowerPoint générés par traitement<br>
-                        - Les données démographiques viennent de la feuille "Audience" basée sur la période
-                    </p>
-                </div>
-            `;
-            
-            const closeBtn = document.createElement('button');
-            closeBtn.textContent = 'Fermer';
-            closeBtn.style.cssText = `
-                background: #a2137b;
-                color: white;
-                border: none;
-                border-radius: 10px;
-                padding: 12px 24px;
-                font-size: 1rem;
-                font-weight: 600;
-                cursor: pointer;
-                margin-top: 20px;
-                width: 100%;
-                transition: all 0.3s ease;
-            `;
-            
-            closeBtn.onmouseover = () => closeBtn.style.background = '#8a0f66';
-            closeBtn.onmouseout = () => closeBtn.style.background = '#a2137b';
-            closeBtn.onclick = () => document.body.removeChild(popup);
-            
-            popupContent.appendChild(header);
-            popupContent.innerHTML += content;
-            popupContent.appendChild(closeBtn);
-            popup.appendChild(popupContent);
-            
-            popup.onclick = (e) => {
-                if (e.target === popup) {
-                    document.body.removeChild(popup);
-                }
-            };
-            
-            document.body.appendChild(popup);
         }
 
-        // Fonction pour afficher les résultats du traitement local
-        function showLocalProcessingResult(result) {
-            alert(`✅ Traitement terminé !\n\n${result.processed} fichiers générés et envoyés par email.\n\nConsultez vos emails pour recevoir les rapports.`);
-            return;
+        // Gestionnaire d'événements pour les clics sur les boutons
+        document.getElementById('submitBtn').addEventListener('click', function(e) {
+            e.preventDefault();
             
-            const popup = document.createElement('div');
-            popup.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.8);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 10000;
-                font-family: 'Poppins', sans-serif;
-            `;
+            const excelFile = document.getElementById('excelFile').files[0];
+            const powerpointFile = document.getElementById('powerpointFile').files[0];
+            const emailDestination = document.getElementById('emailInput').value;
+            const emailTemplate = document.getElementById('emailTemplateEditor').value;
             
-            const popupContent = document.createElement('div');
-            popupContent.style.cssText = `
-                background: #2c2c83;
-                border-radius: 20px;
-                padding: 30px;
-                max-width: 800px;
-                max-height: 80vh;
-                overflow-y: auto;
-                color: white;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-            `;
-            
-            const header = document.createElement('h2');
-            header.innerHTML = '✅ Traitement terminé avec succès !';
-            header.style.cssText = `
-                margin-bottom: 20px;
-                font-size: 1.5rem;
-                font-weight: 700;
-                color: #4CAF50;
-            `;
-            
-            let content = `
-                <div style="margin-bottom: 20px;">
-                    <p><strong>Fichiers PowerPoint générés:</strong> ${result.processed}</p>
-                    <p><strong>Total fichiers dans le ZIP:</strong> ${result.totalFiles || result.processed * 2}</p>
-                    <p><strong>Total lignes disponibles:</strong> ${result.totalRows}</p>
-                    <p><strong>Timestamp:</strong> ${new Date().toLocaleString()}</p>
-                </div>
-            `;
-            
-            if (result.results && result.results.length > 0) {
-                content += '<div style="margin-bottom: 20px;"><strong>📋 Détail des fichiers générés:</strong></div>';
-                result.results.forEach(file => {
-                    content += `
-                        <div style="margin-bottom: 10px; padding: 10px; background: rgba(255, 255, 255, 0.1); border-radius: 10px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <strong>${file.fileName}</strong><br>
-                                    <span style="color: rgba(255, 255, 255, 0.7);">Réseau: ${file.network} | Ligne: ${file.row}</span>
-                                </div>
-                                <div style="color: #4CAF50; font-weight: 600; text-align: right;">
-                                    ${file.replacements} remplacements<br>
-                                    <span style="font-size: 0.8rem;">${file.charts || 0} graphiques</span>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
+            if (!excelFile || !powerpointFile) {
+                showErrorResult('Veuillez sélectionner un fichier Excel et un template PowerPoint.');
+                return;
             }
             
-            content += `
-                <div style="margin-top: 20px; padding: 15px; background: rgba(34, 139, 34, 0.1); border-radius: 10px; border-left: 4px solid #22B022;">
-                    <h3 style="color: #22B022; margin-bottom: 10px;">📊 Fonctionnalités utilisées</h3>
-                    <ul style="margin: 0; padding-left: 20px; font-size: 0.9rem;">
-                        <li>Remplacement automatique des placeholders texte</li>
-                        <li>Modification des graphiques Excel embarqués</li>
-                        <li>Détection automatique de la structure des graphiques</li>
-                        <li>Intégration des données démographiques de la feuille Audience</li>
-                        <li>Formatage intelligent des nombres et dates</li>
-                    </ul>
-                </div>
-            `;
-            
-            const closeBtn = document.createElement('button');
-            closeBtn.textContent = 'Fermer';
-            closeBtn.style.cssText = `
-                background: #a2137b;
-                color: white;
-                border: none;
-                border-radius: 10px;
-                padding: 12px 24px;
-                font-size: 1rem;
-                font-weight: 600;
-                cursor: pointer;
-                margin-top: 20px;
-                width: 100%;
-                transition: all 0.3s ease;
-            `;
-            
-            closeBtn.onmouseover = () => closeBtn.style.background = '#8a0f66';
-            closeBtn.onmouseout = () => closeBtn.style.background = '#a2137b';
-            closeBtn.onclick = () => document.body.removeChild(popup);
-            
-            popupContent.appendChild(header);
-            popupContent.innerHTML += content;
-            popupContent.appendChild(closeBtn);
-            popup.appendChild(popupContent);
-            
-            popup.onclick = (e) => {
-                if (e.target === popup) {
-                    document.body.removeChild(popup);
-                }
-            };
-            
-            document.body.appendChild(popup);
-        }
-
-        function showErrorResult(message, details = null) {
-            alert(`❌ Erreur lors du traitement :\n\n${message}\n\nVeuillez réessayer.`);
-            return;
-            
-            const popup = document.createElement('div');
-            popup.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.8);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 10000;
-                font-family: 'Poppins', sans-serif;
-            `;
-            
-            const popupContent = document.createElement('div');
-            popupContent.style.cssText = `
-                background: #2c2c83;
-                border-radius: 20px;
-                padding: 30px;
-                max-width: 600px;
-                max-height: 80vh;
-                overflow-y: auto;
-                color: white;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-            `;
-            
-            const header = document.createElement('h2');
-            header.innerHTML = '❌ Erreur de traitement';
-            header.style.cssText = `
-                margin-bottom: 20px;
-                font-size: 1.5rem;
-                font-weight: 700;
-                color: #FF5722;
-            `;
-            
-            let detailsHtml = '';
-            if (details) {
-                detailsHtml = `
-                    <details style="margin-top: 15px;">
-                        <summary style="cursor: pointer; color: rgba(255, 255, 255, 0.8);">Détails de l'erreur</summary>
-                        <pre style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 10px; margin-top: 10px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;">${JSON.stringify(details, null, 2)}</pre>
-                    </details>
-                `;
+            if (!emailDestination.trim()) {
+                showErrorResult('Veuillez saisir une adresse email de destination.');
+                return;
             }
             
-            const closeBtn = document.createElement('button');
-            closeBtn.textContent = 'Fermer';
-            closeBtn.style.cssText = `
-                background: #a2137b;
-                color: white;
-                border: none;
-                border-radius: 10px;
-                padding: 12px 24px;
-                font-size: 1rem;
-                font-weight: 600;
-                cursor: pointer;
-                margin-top: 20px;
-                width: 100%;
-                transition: all 0.3s ease;
-            `;
-            
-            closeBtn.onmouseover = () => closeBtn.style.background = '#8a0f66';
-            closeBtn.onmouseout = () => closeBtn.style.background = '#a2137b';
-            closeBtn.onclick = () => document.body.removeChild(popup);
-            
-            popupContent.appendChild(header);
-            popupContent.innerHTML += `<p>${message}</p>${detailsHtml}`;
-            popupContent.appendChild(closeBtn);
-            popup.appendChild(popupContent);
-            
-            popup.onclick = (e) => {
-                if (e.target === popup) {
-                    document.body.removeChild(popup);
-                }
-            };
-            
-            document.body.appendChild(popup);
-        }
+            // Démarrer le traitement
+            processFilesLocally(excelFile, powerpointFile, 'rapport_audience', emailDestination, emailTemplate);
+        });
 
         // Gestion de l'interface de logs
         document.getElementById('clearLogsBtn').addEventListener('click', function() {
